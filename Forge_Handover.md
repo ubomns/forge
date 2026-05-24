@@ -486,6 +486,8 @@ Implementation lives in `styles/globals.css`: the `:root` token block was replac
 
 **Bug discovered during the live-flow Playwright run:** The SSE `section_complete` event in `pages/api/index.ts` / `api/index.py` doesn't include the section's `data` field — only `section_data` does. The frontend was overwriting good streaming data with `undefined` on `section_complete`, causing the resulting `planData` to be malformed and `/api/critique` to return 422 on the first user-triggered critique. Fixed in `components/forge-app.tsx`: on `section_complete`, fall back to the previously-stored `currentSections[sid].data` when `event.data` is absent. This bug was masked by `/demo` (no streaming, full data via `getStaticProps`) and the prior Playwright tests (none ran the live flow).
 
+**Session persistence (clarification of the locked decision):** The "no persistence" lock was about **server-side** state — no DB, no accounts, nothing reaching the backend. Browser-local `sessionStorage` was added in `components/forge-app.tsx` (key `forge:session:v1`) to survive accidental refreshes, Next.js Fast Refresh, and tab-discard from the browser's memory saver. Data still dies when the user closes the tab; the lock is honored in spirit. Hydration happens post-mount (SSR-safe). In-flight states (`status === 'generating'`, `*Status === 'loading'`) are demoted on restore since a dropped SSE stream can't resume. "Start over" calls `clearSession()` in addition to resetting React state.
+
 
 
 Shipped a portfolio-polish redesign on top of the working MVP. Detailed plan in `docs/redesign-proposal.md`. Active task tracking in `task.md`. What changed:

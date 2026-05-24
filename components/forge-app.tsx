@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
     motion,
     AnimatePresence,
@@ -44,6 +44,64 @@ function initialSections(): SectionsState {
         s[id] = { status: 'pending' };
     }
     return s as SectionsState;
+}
+
+/**
+ * Session persistence via sessionStorage.
+ *
+ * Honors the "no persistence" locked decision in spirit: data lives in the
+ * browser tab only, is never sent to a server, and is cleared automatically
+ * when the user closes the tab or hits "Start over". The point is to survive
+ * accidental refreshes / Fast Refresh / tab discard — NOT to persist across
+ * sessions.
+ */
+const STORAGE_KEY = 'forge:session:v1';
+type AsyncStatus = 'idle' | 'loading' | 'done' | 'error';
+
+interface PersistedSession {
+    description: string;
+    industry: string;
+    stage: Stage | '';
+    marketContext: string;
+    sections: SectionsState;
+    planData: BusinessPlan | null;
+    status: Status;
+    errorMessage: string;
+    critiques: CritiqueWithId[];
+    critiqueStatus: AsyncStatus;
+    acceptedCritiqueIds: string[];
+    dismissedCritiqueIds: string[];
+    investorQuestions: InvestorQuestion[];
+    investorQuestionsStatus: AsyncStatus;
+}
+
+function loadSession(): PersistedSession | null {
+    if (typeof window === 'undefined') return null;
+    try {
+        const raw = window.sessionStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw) as PersistedSession;
+    } catch {
+        return null;
+    }
+}
+
+function saveSession(s: PersistedSession) {
+    if (typeof window === 'undefined') return;
+    try {
+        window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    } catch {
+        // Quota exceeded or storage disabled — ignore.
+    }
+}
+
+function clearSession() {
+    if (typeof window === 'undefined') return;
+    try {
+        window.sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+        // ignore
+    }
 }
 
 function TiltCard({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -100,6 +158,87 @@ export function ForgeApp() {
     const [investorQuestions, setInvestorQuestions] = useState<InvestorQuestion[]>([]);
     const [investorQuestionsStatus, setInvestorQuestionsStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
     const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    // ── Session persistence ───────────────────────────────────────────────
+    // Hydrate from sessionStorage on mount; demote in-flight states (a
+    // 'generating' or 'loading' status implies a dropped stream that can't
+    // resume). The state-setters inside this effect are unavoidable — SSR
+    // cannot read sessionStorage, so hydration must happen post-mount.
+    const [hydrated, setHydrated] = useState(false);
+    /* eslint-disable react-hooks/set-state-in-effect */
+    useEffect(() => {
+        const saved = loadSession();
+        if (saved) {
+            setDescription(saved.description ?? '');
+            setIndustry(saved.industry ?? '');
+            setStage((saved.stage ?? '') as Stage | '');
+            setMarketContext(saved.marketContext ?? '');
+            setSections(saved.sections ?? initialSections());
+            setPlanData(saved.planData ?? null);
+            const hadAnyContent = Object.values(saved.sections ?? {}).some(
+                (s) => (s as SectionState).status === 'done'
+            );
+            const restoredStatus: Status =
+                saved.status === 'generating'
+                    ? hadAnyContent
+                        ? 'done'
+                        : 'idle'
+                    : saved.status ?? 'idle';
+            setStatus(restoredStatus);
+            setErrorMessage(saved.errorMessage ?? '');
+            setCritiques(saved.critiques ?? []);
+            setCritiqueStatus(
+                saved.critiqueStatus === 'loading' ? 'idle' : saved.critiqueStatus ?? 'idle'
+            );
+            setAcceptedCritiqueIds(new Set(saved.acceptedCritiqueIds ?? []));
+            setDismissedCritiqueIds(new Set(saved.dismissedCritiqueIds ?? []));
+            setInvestorQuestions(saved.investorQuestions ?? []);
+            setInvestorQuestionsStatus(
+                saved.investorQuestionsStatus === 'loading'
+                    ? 'idle'
+                    : saved.investorQuestionsStatus ?? 'idle'
+            );
+        }
+        setHydrated(true);
+    }, []);
+    /* eslint-enable react-hooks/set-state-in-effect */
+
+    // Persist on every relevant state change once hydration is complete.
+    useEffect(() => {
+        if (!hydrated) return;
+        saveSession({
+            description,
+            industry,
+            stage,
+            marketContext,
+            sections,
+            planData,
+            status,
+            errorMessage,
+            critiques,
+            critiqueStatus,
+            acceptedCritiqueIds: Array.from(acceptedCritiqueIds),
+            dismissedCritiqueIds: Array.from(dismissedCritiqueIds),
+            investorQuestions,
+            investorQuestionsStatus,
+        });
+    }, [
+        hydrated,
+        description,
+        industry,
+        stage,
+        marketContext,
+        sections,
+        planData,
+        status,
+        errorMessage,
+        critiques,
+        critiqueStatus,
+        acceptedCritiqueIds,
+        dismissedCritiqueIds,
+        investorQuestions,
+        investorQuestionsStatus,
+    ]);
 
     const sectionStatusKey = SECTION_ORDER.map(
         (id) => sections[id]?.status ?? 'pending'
@@ -219,6 +358,7 @@ export function ForgeApp() {
         setDismissedCritiqueIds(new Set());
         setInvestorQuestions([]);
         setInvestorQuestionsStatus('idle');
+        clearSession();
         setTimeout(() => inputRef.current?.focus(), 50);
     };
 
