@@ -391,40 +391,6 @@ export function ForgeApp() {
         }
     }, [planData, critiqueStatus]);
 
-    const acceptCritique = useCallback((id: string, editedSuggestion?: string) => {
-        setAcceptedCritiqueIds(prev => new Set(prev).add(id));
-        if (editedSuggestion !== undefined) {
-            setCritiques(prev => prev.map(c => c.id === id ? { ...c, suggestion: editedSuggestion } : c));
-        }
-    }, []);
-
-    const dismissCritique = useCallback((id: string) => {
-        setDismissedCritiqueIds(prev => new Set(prev).add(id));
-    }, []);
-
-    const handleInvestorQuestions = useCallback(async () => {
-        if (!planData || investorQuestionsStatus === 'loading') return;
-        setInvestorQuestionsStatus('loading');
-        try {
-            const response = await fetch('/api/investor-questions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan: planData }),
-            });
-            if (!response.ok) {
-                let message = 'Failed to generate questions. Please try again.';
-                try { const b = await response.json(); if (b?.error?.message) message = b.error.message; } catch { /* use default */ }
-                throw new Error(message);
-            }
-            const data = await response.json();
-            setInvestorQuestions(data.questions ?? []);
-            setInvestorQuestionsStatus('done');
-        } catch (err) {
-            setErrorMessage(err instanceof Error ? err.message : 'Failed to generate questions.');
-            setInvestorQuestionsStatus('error');
-        }
-    }, [planData, investorQuestionsStatus]);
-
     const handleRegenerate = useCallback(async (sectionId: SectionId, instruction?: string) => {
         if (!planData) return;
         setSections(prev => ({
@@ -460,6 +426,52 @@ export function ForgeApp() {
             }));
         }
     }, [planData]);
+
+    const acceptCritique = useCallback((id: string, editedSuggestion?: string) => {
+        const critique = critiques.find(c => c.id === id);
+        if (!critique) return;
+
+        // Mark accepted and capture any edits the user made before clicking Accept.
+        const suggestion = editedSuggestion ?? critique.suggestion;
+        setAcceptedCritiqueIds(prev => new Set(prev).add(id));
+        if (editedSuggestion !== undefined) {
+            setCritiques(prev => prev.map(c => c.id === id ? { ...c, suggestion: editedSuggestion } : c));
+        }
+
+        // Apply the critique by regenerating the affected section with the suggestion
+        // as the instruction. Live LLM call; the section transitions to streaming.
+        void handleRegenerate(
+            critique.section_id,
+            `Apply this critique to improve the section: ${suggestion}`
+        );
+    }, [critiques, handleRegenerate]);
+
+    const dismissCritique = useCallback((id: string) => {
+        setDismissedCritiqueIds(prev => new Set(prev).add(id));
+    }, []);
+
+    const handleInvestorQuestions = useCallback(async () => {
+        if (!planData || investorQuestionsStatus === 'loading') return;
+        setInvestorQuestionsStatus('loading');
+        try {
+            const response = await fetch('/api/investor-questions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan: planData }),
+            });
+            if (!response.ok) {
+                let message = 'Failed to generate questions. Please try again.';
+                try { const b = await response.json(); if (b?.error?.message) message = b.error.message; } catch { /* use default */ }
+                throw new Error(message);
+            }
+            const data = await response.json();
+            setInvestorQuestions(data.questions ?? []);
+            setInvestorQuestionsStatus('done');
+        } catch (err) {
+            setErrorMessage(err instanceof Error ? err.message : 'Failed to generate questions.');
+            setInvestorQuestionsStatus('error');
+        }
+    }, [planData, investorQuestionsStatus]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') generate();

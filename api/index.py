@@ -262,15 +262,17 @@ async def regenerate(request: Request, req: RegenerateRequest):
     if req.instruction:
         instruction_suffix = f"\n\nAdditional instruction from the user: {req.instruction}"
 
-    section_schema = BusinessPlan.model_json_schema()
+    # Use the strict-normalized BusinessPlan schema so nested objects already have
+    # `additionalProperties: false` and $ref entries don't carry sibling keywords.
+    # Without this, OpenAI strict mode rejects the request with 400.
+    full_plan_schema = schema_json()
     single_section_schema = {
         "type": "object",
-        "properties": {req.section_id: section_schema["properties"][req.section_id]},
+        "properties": {req.section_id: full_plan_schema["properties"][req.section_id]},
         "required": [req.section_id],
         "additionalProperties": False,
+        "$defs": full_plan_schema.get("$defs", {}),
     }
-    if "$defs" in section_schema:
-        single_section_schema["$defs"] = section_schema["$defs"]
 
     user_msg = f"Here is the rest of the business plan for context:\n{context_str}\n\nNow rewrite the **{display_name}** section. Make it more specific, credible, and detailed than the original.{instruction_suffix}"
 
