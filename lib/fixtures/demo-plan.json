@@ -1,0 +1,194 @@
+{
+  "source": {
+    "fixture_id": "eval-006",
+    "label": "Neighborhood childcare cooperative platform"
+  },
+  "input": {
+    "description": "Neighborhood childcare cooperative platform",
+    "industry": "Marketplace / Family",
+    "stage": "idea",
+    "market_context": "Urban and suburban parents seeking affordable, community-based childcare alternatives"
+  },
+  "plan": {
+    "executive_summary": {
+      "tagline": "Empowering communities with affordable, trusted neighborhood childcare.",
+      "elevator_pitch": "Our platform connects urban and suburban parents to create cooperative childcare networks, enabling affordable, flexible, and community-driven childcare solutions. By fostering peer-to-peer trust and shared caregiving responsibilities, we reduce costs and increase accessibility for busy families seeking alternatives to traditional daycare."
+    },
+    "problem": {
+      "description": "Parents in urban and suburban areas face high childcare costs, limited trusted options, and inflexible schedules that do not fit their family needs.",
+      "pain_points": [
+        "Childcare costs often exceed 20-30% of family income, straining budgets.",
+        "Waiting lists and limited availability at quality daycare centers.",
+        "Lack of affordable, flexible options that fit varied work schedules.",
+        "Parents feel isolated without local trusted childcare networks.",
+        "High turnover and impersonal care in commercial childcare settings."
+      ]
+    },
+    "solution": {
+      "description": "A digital platform that facilitates neighborhood childcare cooperatives by connecting parents willing to share caregiving duties, schedule swaps, and collective child supervision within trusted local communities.",
+      "key_features": [
+        "User profiles with vetting and background checks to build trust.",
+        "Scheduling tools to coordinate care shifts and swaps among cooperative members.",
+        "Communication channels for parent-to-parent interaction and support.",
+        "Rating and review system to ensure quality and accountability.",
+        "Resource hub with childcare best practices and legal guidance for cooperatives."
+      ]
+    },
+    "market": {
+      "tam": "In the U.S., approximately 15 million children under age 6 have working parents, representing a $50 billion childcare market opportunity.",
+      "sam": "Targeting urban and suburban parents in mid- to high-income ZIP codes initially, about 10 million children, a $15 billion segment.",
+      "som": "Capturing 1% of the SAM within 3 years, equating to 100,000 children served and roughly $150 million in gross transaction volume through the platform annually.",
+      "segments": [
+        "Dual-income families in metro areas with children aged 0-6.",
+        "Parents seeking cost-effective alternatives to traditional daycare.",
+        "Community-minded families valuing peer support and trust."
+      ]
+    },
+    "competition": {
+      "overview": "Current solutions include traditional daycare centers, nanny services, babysitting apps, and informal parent groups on social media. None fully harness neighborhood cooperative models with technology to facilitate shared childcare responsibilities at scale.",
+      "advantages": [
+        "Focus on cooperative, peer-to-peer caregiving reducing costs dramatically.",
+        "Built-in trust mechanisms like background checks and ratings.",
+        "Scheduling flexibility tailored to parents’ real-life needs.",
+        "Community building aspects fostering local support beyond childcare.",
+        "Lower cost structure compared to commercial daycare or nanny services."
+      ],
+      "competitors": [
+        "Care.com",
+        "UrbanSitter",
+        "Bubble",
+        "Local parenting Facebook groups"
+      ]
+    },
+    "go_to_market": {
+      "strategy": "Leverage community partnerships, local parenting groups, and targeted digital marketing to onboard early adopter parents. Create a referral program incentivizing cooperative growth within neighborhoods. Partner with employers and schools to promote the platform as a family support resource.",
+      "channels": [
+        "Social media advertising targeting parents in key cities.",
+        "Partnerships with local community centers and schools.",
+        "Collaborations with HR departments of companies offering family benefits.",
+        "Content marketing via blogs and webinars on cooperative childcare benefits."
+      ],
+      "milestones": [
+        "Launch MVP with basic scheduling and profiles in a pilot city within 6 months.",
+        "Reach 1,000 active parent users and 100 cooperative groups by month 9.",
+        "Secure first strategic partnerships with employers and community orgs by month 12.",
+        "Expand to 3 additional metro areas by month 18."
+      ]
+    },
+    "business_model": {
+      "revenue_streams": [
+        "Subscription fees from parents for premium features and enhanced background checks.",
+        "Transaction fees (5%) on any paid childcare services arranged through platform.",
+        "Affiliate partnerships with childcare product vendors and local services."
+      ],
+      "pricing": "Base platform access is free to encourage adoption. Premium membership at $15/month offers advanced scheduling, priority customer support, and enhanced vetting. Transaction fees apply only on paid childcare exchanges.",
+      "unit_economics": "Average Customer Acquisition Cost (CAC) estimated at $40 via digital and community marketing. Lifetime Value (LTV) projected at $300 based on subscription and transaction revenue. Gross margins expected at 70% after platform maintenance and support costs."
+    },
+    "team": {
+      "needed_roles": [
+        "CTO/Lead Developer to build and scale the platform.",
+        "Community Manager to engage parents and grow cooperative groups.",
+        "Marketing Lead to execute digital and partnership strategies.",
+        "Customer Support Specialist to handle onboarding and issue resolution."
+      ],
+      "current_gaps": [
+        "Technical co-founder or senior developer.",
+        "Experienced community engagement professional.",
+        "Marketing expertise in family-focused digital products."
+      ]
+    },
+    "financials": {
+      "revenue_projection": "Year 1: $500K from initial pilot and subscriptions. Year 2: $3M as platform scales to multiple cities. Year 3: $10M with expanded services and partnerships.",
+      "key_costs": [
+        "Platform development and hosting.",
+        "Marketing and customer acquisition.",
+        "Background check services.",
+        "Staff salaries for community management and support."
+      ],
+      "break_even": "Expected to break even by the end of Year 2 as user base and subscription revenue grow."
+    },
+    "ask": {
+      "amount": "$1.5 million",
+      "use_of_funds": [
+        "Develop and launch MVP platform with core features.",
+        "Hire key team members: CTO, Community Manager, Marketing Lead.",
+        "Execute go-to-market strategy in initial pilot city.",
+        "Establish partnerships with employers and community organizations.",
+        "Implement security and compliance measures for user safety."
+      ],
+      "vision": "To become the leading trusted platform for neighborhood childcare cooperatives nationwide, transforming how families access affordable, flexible childcare while building stronger community bonds."
+    }
+  },
+  "critiques": [
+    {
+      "section_id": "market",
+      "severity": "high",
+      "claim": "SOM: Capturing 1% of the SAM within 3 years, equating to 100,000 children served and roughly $150 million in gross transaction volume through the platform annually.",
+      "suggestion": "Provide detailed assumptions and evidence supporting the feasibility of capturing 1% of the SAM within 3 years, including user adoption rates, conversion metrics, and growth strategy specifics to justify this ambitious market share and transaction volume projection."
+    },
+    {
+      "section_id": "business_model",
+      "severity": "high",
+      "claim": "Transaction fees (5%) on any paid childcare services arranged through platform.",
+      "suggestion": "Clarify how the platform will enforce and track paid childcare transactions within cooperative arrangements, considering many may be informal or barter-based, and explain the legal and operational mechanisms to collect transaction fees reliably."
+    },
+    {
+      "section_id": "financials",
+      "severity": "high",
+      "claim": "Revenue Projection: Year 1: $500K from initial pilot and subscriptions. Year 2: $3M as platform scales to multiple cities. Year 3: $10M with expanded services and partnerships.",
+      "suggestion": "Include detailed financial models showing user growth, conversion rates to paid services, subscription uptake, and transaction volume to substantiate these revenue projections, ensuring they align with the market size and business model assumptions."
+    },
+    {
+      "section_id": "team",
+      "severity": "medium",
+      "claim": "Current gaps: Technical co-founder or senior developer; Experienced community engagement professional; Marketing expertise in family-focused digital products.",
+      "suggestion": "Develop a clear hiring plan with timelines and candidate profiles to fill these critical team gaps quickly, and consider interim solutions such as advisors or contractors to mitigate risks until full hires are made."
+    },
+    {
+      "section_id": "solution",
+      "severity": "medium",
+      "claim": "User profiles with vetting and background checks to build trust.",
+      "suggestion": "Explain the process, costs, and legal considerations of conducting background checks, and how these will be managed at scale to maintain user trust and safety without significant overhead."
+    },
+    {
+      "section_id": "go_to_market",
+      "severity": "medium",
+      "claim": "Leverage community partnerships, local parenting groups, and targeted digital marketing to onboard early adopter parents.",
+      "suggestion": "Provide more specifics on how partnerships will be established and incentivized, and include metrics or case studies from similar platforms to demonstrate the effectiveness of these channels in acquiring users."
+    },
+    {
+      "section_id": "competition",
+      "severity": "medium",
+      "claim": "None fully harness neighborhood cooperative models with technology to facilitate shared childcare responsibilities at scale.",
+      "suggestion": "Conduct a deeper competitive analysis to identify any emerging or niche players pursuing cooperative childcare models, and articulate the unique defensible advantages your platform holds over these to strengthen the competitive positioning."
+    }
+  ],
+  "investor_questions": [
+    {
+      "question": "How do you plan to ensure the safety and legal compliance of informal cooperative childcare arrangements, given the complex liability and regulatory landscape across different states and municipalities?",
+      "why_it_matters": "Childcare is a highly regulated space with significant liability concerns. The plan relies on peer-to-peer caregiving, which may expose the company and users to legal risks if not properly managed. Understanding the regulatory approach is critical to assess feasibility and risk.",
+      "section_id": "solution"
+    },
+    {
+      "question": "Your unit economics assume a $40 Customer Acquisition Cost (CAC) and $300 Lifetime Value (LTV), but given the niche and trust-building nature of your platform, what evidence supports these assumptions, and how will you sustain growth beyond early adopters?",
+      "why_it_matters": "CAC and LTV estimates drive the business model's viability. Without validated data, these assumptions may be overly optimistic, especially for a trust-dependent community platform requiring deep engagement.",
+      "section_id": "business_model"
+    },
+    {
+      "question": "Given that your target users are parents with limited time and high childcare needs, what concrete strategies will you implement to motivate and sustain active participation in cooperative caregiving, which requires significant coordination and commitment?",
+      "why_it_matters": "The platform's success depends on parents exchanging childcare duties reliably. This behavioral challenge is often underestimated and could limit growth if parents are unwilling or unable to participate as expected.",
+      "section_id": "solution"
+    },
+    {
+      "question": "How do you differentiate and defend against established competitors like Care.com and UrbanSitter who could replicate cooperative features or leverage their scale and resources to enter this niche?",
+      "why_it_matters": "Competitive threats from large incumbents could undermine market capture. The plan's defensibility and unique value proposition need to be clearly articulated to justify investment.",
+      "section_id": "competition"
+    },
+    {
+      "question": "Your financial projections show rapid revenue growth to $10M by Year 3 and break-even by end of Year 2. What are the key risks and assumptions behind these projections, and what contingency plans do you have if user adoption or monetization falls short?",
+      "why_it_matters": "Financial projections are optimistic and must be stress-tested. Investors need to understand the risks and fallback strategies to evaluate the investment's risk-return profile.",
+      "section_id": "financials"
+    }
+  ],
+  "frozen_at": "2026-05-24T14:05:35"
+}

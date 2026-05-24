@@ -1,8 +1,8 @@
 # Forge — Project Continuity & Technical Handover
 
-**Document type:** Machine-to-machine project handover
-**Generated:** 2026-05-24
-**Engagement state:** Strategic planning / pre-refactor
+**Document type:** Machine-to-machine project handover  
+**Generated:** 2026-05-24 (updated — all milestones shipped)  
+**Engagement state:** Post-M1/M2/M3. All planned features shipped and building clean.  
 **Receiving agent:** Assume zero prior context
 
 ---
@@ -29,7 +29,6 @@ The longer-term strategic direction is to use Forge as a **portfolio stepping st
 ### Intended users / stakeholders
 
 - Early-stage founders preparing for investors, accelerators, or their own thinking.
-- Currently used by the user themselves plus "a handful of founders" (vague — flagged as needing a real number or removal from the case study).
 - No formal team; this is a personal product.
 
 ### Expected business / strategic impact
@@ -47,41 +46,42 @@ The longer-term strategic direction is to use Forge as a **portfolio stepping st
 
 ## 2. Current Project State
 
-### What exists today (verified)
+### What exists today (verified, shipped)
 
-- Single-input ingestion: one-line business idea plus a few structured fields (industry, stage, market).
-- Plan generation from the short description.
-- **Word (.docx) export.**
-- No accounts. No persistence. Session-scoped only.
-
-### What the case study claims (NOT yet built — this is the spec, not the status)
-
-The polished case study currently reads as if these are shipped. **They are not.** This was explicitly clarified by the user. The case study is the **future state** Forge is being built toward. The receiving agent must not assume any of the following are implemented:
-
-- Typed schema per section using OpenAI Structured Outputs
-- Streaming sectioned generation in the UI
-- A second LLM call ("critic agent") per section with its own prompt and context
-- Structured severity field on critic output (`low / medium / high`)
-- Default UI filter showing only medium-and-above critic issues; low-severity collapsed
-- Inline accept / edit / ignore on critique suggestions
-- PDF export (Word export exists; PDF does not)
-- FastAPI orchestration layer (current orchestration location unconfirmed — likely Next.js frontend)
+- **M1 — Schema refactor (shipped)**
+  - Pydantic `BusinessPlan` schema with 10 industry-standard sections (`api/schema.py`)
+  - FastAPI `/api/generate` using gpt-4.1-mini structured outputs — one call, whole-plan output
+  - Next.js thin proxy (`pages/api/index.ts`) — no business logic in frontend
+  - `PlanRenderer` component — schema-driven section rendering
+  - Sectioned streaming UI via SSE (`section_start`, `section_data`, `section_complete`, `error`, `[DONE]`)
+  - Optional collapsed input fields (industry, stage, target market)
+  - `.docx` export wired through schema → `python-docx`
+- **M2 — Critic agent (shipped)**
+  - `/api/critique` route with structured `CritiqueResponse` (per-section `{severity, claim, suggestion}`)
+  - `CritiqueOverlay` component with severity badges (low/medium/high)
+  - Accept/edit/dismiss actions per critique — "Edit" opens inline textarea to modify suggestion before accepting
+  - "+N nits" toggle to show/hide low-severity
+  - Explicit "Critique plan" button (not automatic)
+  - Critic receives full plan context (enables cross-section contradiction detection)
+- **M3 — Medium-term features (shipped)**
+  - PDF export via `fpdf2` (`/api/export-pdf`)
+  - Section regeneration (`/api/regenerate` — sends rest of plan as context)
+  - Investor question generation (`/api/investor-questions`)
+  - 8-fixture eval suite in `evals/`
+- **Pre-refactor cleanup (T1–T6):** Brand rename, dep cleanup, typed errors, hero copy alignment
 
 ### Maturity level
 
-- **Functional MVP** with the absolute minimum (idea in, plan out, Word download).
-- **Architecturally pre-refactor.** The schema refactor is the keystone work item.
-- **Pre-evaluation.** No eval suite for critic quality. No automated quality measurement.
+- **Full feature set.** All case-study claims are now true in code.
+- **Architecturally stable.** FastAPI owns orchestration; Next.js is UI + proxy.
+- **Not yet deployed.** Runs locally via `npm run dev:all`. No CI/CD, no staging, no production hosting.
 
-### Outstanding gaps
+### Remaining gaps
 
-- No schema layer.
-- No critic.
-- No PDF.
-- No streaming.
-- No eval suite.
-- No independent versioning between (future) drafter and critic.
-- "Used by founders" claim is unsubstantiated — needs real usage numbers or removal.
+- No persistence, auth, or DB (by design).
+- No CI/CD or deployment pipeline.
+- "Used by founders" claim in case study is still unsubstantiated — needs real usage numbers or removal.
+- Evals exist but have not been run end-to-end against OpenAI (require manual `python run_eval.py` with `OPENAI_API_KEY` set).
 
 ---
 
@@ -89,36 +89,46 @@ The polished case study currently reads as if these are shipped. **They are not.
 
 ### Frontend
 
-- **Next.js** — handles input UI and rendering.
+- **Next.js 16.2.4 + React 19** on Pages Router (not App Router).
+- **Tailwind v4** via `@tailwindcss/postcss`. No `tailwind.config.*` — config lives in `styles/globals.css`.
+- **framer-motion** v12 for animation.
+- **shadcn conventions**: `cn()` from `lib/utils.ts`, `cva` for variants, Radix `Slot` for `asChild`.
+- Path alias: `@/*` → repo root.
 - Frontend stays a UI, **not an agent host.** Explicitly decided.
 
 ### Backend / orchestration
 
-- **FastAPI** — intended to handle orchestration, schema validation, and the two-agent call chain.
-- Status: **planned per case study**, current implementation reality not fully confirmed in this session. Likely still partially or fully running through Next.js routes today.
+- **FastAPI** (`api/index.py`) owns the OpenAI call, schema validation, export, and all business logic.
+- Next.js routes in `pages/api/` are thin proxies — they contain **no** business logic.
+- Model: **gpt-4.1-mini** for both drafter and critic.
 
 ### AI / LLM layer
 
-- **Provider:** OpenAI (referenced explicitly — "OpenAI's structured outputs API," "second OpenAI call").
-- **Pattern:** Two separate calls — drafter and critic — with different prompts and different context windows.
-- **Critical constraint:** The critic must NOT be the same model re-prompted to critique its own output. The case study explicitly rejects this: *"the same model asked to critique its own output… produces shallow critique because the model defends what it just wrote."* The receiving agent must treat this as a locked design decision.
+- **Provider:** OpenAI (structured outputs API).
+- **Pattern:** Two sequential LLM calls — drafter then critic — with different prompts and context.
+- **Drafter:** One call, full `BusinessPlan` schema. Not per-section calls.
+- **Critic:** Receives full serialized plan. Outputs structured `CritiqueResponse` with per-section `{severity, claim, suggestion}` items.
+- **Regenerate:** One call for a single section, rest of plan in context for coherence.
+
+### Wire format (SSE)
+
+- `/api/generate` streams: `section_start`, `section_data`, `section_complete`, `error`, `[DONE]`.
+- `/api/critique`, `/api/investor-questions`, `/api/regenerate` return JSON (not SSE).
+- `/api/export` returns `.docx` binary. `/api/export-pdf` returns `.pdf` binary.
 
 ### Data layer
 
 - **None.** Intentional. Session-scoped. No DB, no auth, no saved drafts.
-- Reconsidered only "if a real user asks" — not before.
 
-### Hosting / deployment
+### Security
 
-- Not extensively discussed. The two-agent split should be **independently versioned and deployed**, per the case study's "what I'd do differently" — but the user has not yet built the coupled version, so this is forward-looking, not retrospective.
-
-### Security / compliance
-
-- Privacy posture is *absence-based*: nothing stored means nothing to leak. Founder plans treated as sensitive by default.
+- Rate limiting on all FastAPI routes via `slowapi`.
+- Privacy posture is *absence-based*: nothing stored means nothing to leak.
 
 ### Scalability / extensibility
 
-- Schema-first design is the extensibility play. Once sections are typed, the same schema can render to UI, Word, PDF, and future evals/critic feedback.
+- Schema-first design is the extensibility contract. Same schema drives generation, rendering, export, and critique.
+- Type-mirroring: Pydantic (`api/schema.py`) ↔ TypeScript (`lib/schema/business-plan.ts`). Changes must stay in sync.
 
 ---
 
@@ -129,16 +139,17 @@ The polished case study currently reads as if these are shipped. **They are not.
 - **Structure over freeform.** A business plan has a known shape. Use the shape as a schema, force the model to fill it.
 - **Two agents over one bigger prompt.** A "generate then critique" single prompt produces a *defended* draft. Splitting forces non-defensive critique.
 
-### Generator agent
+### Generator (drafter)
 
-- Drafts plan content section-by-section against a typed schema (planned).
-- Streams output as sections complete (planned).
+- One LLM call against the full `BusinessPlan` schema.
+- Streams sections as they complete via SSE.
+- Optional parameters: `industry`, `stage`, `target_market`.
 
 ### Critic agent
 
-- **Different prompt.** Different context window. No knowledge of the generator's reasoning.
-- Emits **structured per-section feedback** against the same schema.
-- Each critique includes a **severity field** — this is the load-bearing detail in the case study and the "hard problem worth mentioning" passage.
+- **Different prompt.** Different system instructions. Receives the full serialized plan.
+- Emits **structured per-section feedback** with `severity` field.
+- Critic triggered by explicit "Critique plan" button (not automatic — saves API calls, lets user review first).
 
 ### Severity field — design intelligence (PRESERVE)
 
@@ -150,16 +161,17 @@ The polished case study currently reads as if these are shipped. **They are not.
   3. Low-severity nits collapsed by default.
 - This is the cleanest engineering lesson in the project. Do not regress to tone-prompt fixes.
 
-### Context management strategy
+### Section regeneration
 
-- Drafter and critic receive **separate, isolated context windows**. This isolation is the mechanism that produces useful critique.
-- For future section regeneration: the rest of the plan stays in context while one section is regenerated. This is explicitly called out as a "context engineering" demonstration target.
+- Sends the rest of the plan as context while regenerating one section.
+- Demonstrates context engineering — keeps coherence across sections.
+- Accept regenerates the section in place; the original section is replaced.
 
 ### Honest framing of "multi-agent"
 
 - The current design is **two sequential LLM calls with different prompts and contexts** — a *pipeline*, not an agent loop.
 - True agentic patterns (tool use, persistent state, loops with stopping conditions, verification gates) are **not yet present.**
-- The case study language ("two agents") is defensible but should not be overstated to the level of true agentic systems. The user has been advised to either acknowledge this scope honestly OR upgrade the design (critic loops until quality bar met, tool-use for fact-checking, etc.).
+- The language "two agents" is defensible but should not be overstated to the level of true agentic systems.
 
 ---
 
@@ -167,224 +179,220 @@ The polished case study currently reads as if these are shipped. **They are not.
 
 ### Module: Single-input ingestion
 
-- **Purpose:** Reduce friction to a single line + a few structured fields.
-- **Status:** Implemented.
+- **Purpose:** Reduce friction to a single line + optional structured fields.
+- **Status:** ✅ Shipped. Optional fields (industry, stage, market) default to hidden.
 - **Business value:** Eliminates multi-step wizard fatigue.
-- **Dependencies:** None.
 
 ### Module: Sectioned generation
 
-- **Purpose:** Generate the business plan against a fixed section shape.
-- **Status:** Partial — generation works, but section-typed schema does not yet exist.
-- **Dependencies:** Schema refactor.
-- **Next step:** Define `BusinessPlanSection` types (executive summary, market, product, GTM, financials, etc.) with prose nested as typed fields.
+- **Purpose:** Generate the business plan against a fixed 10-section schema.
+- **Status:** ✅ Shipped. One call, whole-plan structured output, streamed via SSE.
+- **Sections:** Executive Summary, Problem, Solution, Market Analysis, Business Model, Go-to-Market Strategy, Competitive Landscape, Team, Financial Projections, The Ask.
 
 ### Module: Streamed UI
 
 - **Purpose:** Founder sees motion within ~1s; sections stream in.
-- **Status:** Not built.
-- **Dependencies:** Schema refactor; per-section generation calls.
+- **Status:** ✅ Shipped. SSE events render sections as they arrive.
+- **Wire format:** `section_start` → `section_data` → `section_complete` per section, then `[DONE]`.
 
 ### Module: Critic agent
 
 - **Purpose:** Second LLM call producing structured per-section feedback with severity.
-- **Status:** Not built. This is the second milestone after structured outputs.
-- **Dependencies:** Schema refactor must come first.
-- **Functional behavior:** Inline suggestions; founder can accept, edit, or ignore.
+- **Status:** ✅ Shipped. Explicit button trigger. Full plan context. Structured output.
+- **UI:** Inline severity badges, edit/accept/dismiss actions (edit opens inline textarea), "+N nits" toggle for low-severity.
 
-### Module: Severity-based UI filtering
+### Module: Severity-based UI filtering with inline edit
 
-- **Purpose:** Critic stays sharp; founder sees sharp output only where actionable.
-- **Status:** Not built.
-- **Dependencies:** Critic must exist first.
+- **Purpose:** Critic stays sharp; founder sees sharp output only where actionable. Edit lets founder modify suggestion text before accepting.
+- **Status:** ✅ Shipped. Medium+ shown by default. Low collapsed. Edit opens inline textarea; "Accept edited" saves the modified suggestion.
 
 ### Module: Word export
 
-- **Purpose:** Downloadable .docx.
-- **Status:** Implemented (current MVP).
-- **Note:** Will need to be re-wired to render *from the schema* once the refactor happens, rather than from prose.
+- **Purpose:** Downloadable `.docx`.
+- **Status:** ✅ Shipped. Renders from schema via `python-docx`.
 
 ### Module: PDF export
 
 - **Purpose:** Print-ready PDF rendered from the schema.
-- **Status:** Not built.
+- **Status:** ✅ Shipped. `fpdf2`-based, proxied through `/api/export-pdf`.
 
 ### Module: Section regeneration with context
 
-- **Purpose:** Click any section, request "make this more detailed" or "rewrite for an angel investor."
-- **Status:** Not built. Listed as **medium impact / low effort** in the recommendations.
-- **Strategic value:** Demonstrates context engineering — keeping rest of plan in context while regenerating one part.
+- **Purpose:** Click any section's regenerate button; rest of plan stays in context.
+- **Status:** ✅ Shipped. `/api/regenerate` route. Regenerate button per section in PlanRenderer.
 
 ### Module: Investor-question generation
 
 - **Purpose:** After plan generation, produce the 5 hardest questions an investor would ask.
-- **Status:** Not built. **Lowest priority** of the four recommendations — useful but weakest engineering signal.
+- **Status:** ✅ Shipped. `/api/investor-questions` route.
 
-### Module: Eval suite (recommended addition)
+### Module: Eval suite
 
-- **Purpose:** Measure critic quality. 5–10 fixtures, rubric, before/after critic outputs.
-- **Status:** Not built. **Flagged by assistant as missing** but described in the case study's "what I'd do differently" section.
-- **Strategic value:** Without it, "the critic is tuned" is an unverified claim.
+- **Purpose:** Measure critic and generator quality. 8 fixtures + `run_eval.py`.
+- **Status:** ✅ Shipped. `evals/` directory with JSON fixtures.
+- **Note:** Not yet run end-to-end against OpenAI. Run with `cd evals && python run_eval.py` (requires `OPENAI_API_KEY` and FastAPI running).
+
+### Module: Rate limiting
+
+- **Purpose:** Prevent abuse on all FastAPI routes.
+- **Status:** ✅ Shipped. `slowapi` middleware.
 
 ---
 
-## 6. Deliverables & Artifacts Created (in this engagement)
+## 6. Key Files
 
-### Artifact 1: Analysis of the Forge document
-
-- **Form:** Conversational analysis in chat.
-- **Purpose:** Critique the user's case study draft + recommendations.
-- **Contents summary:**
-  - Identified the apparent contradiction between recommendations (critic = future) and case study (critic = shipped) — later clarified by user as intentional (future state framing).
-  - Ranked the four recommendations by signal-per-effort: structured outputs → critic → section regen → investor questions.
-  - Flagged "tuning the critic" passage as the strongest part of the case study.
-  - Flagged the vague "handful of founders" usage claim as needing real data or removal.
-  - Flagged the absence of an eval story as the credibility gap.
-  - Noted that "two agents" is honestly a pipeline, not an agent loop, and recommended either honest framing or design upgrade.
-- **Status:** Delivered conversationally. Not codified into a separate document.
-
-### Artifact 2: Current-state → future-state gap map
-
-- **Form:** Inline table in chat.
-- **Purpose:** Show the user exactly which claims in the case study are aspirational vs. true today.
-- **Contents:** Per-claim breakdown (typed schema, streaming, critic, severity, accept/edit/ignore, Word, PDF, FastAPI, no-persistence).
-- **Status:** Delivered.
-
-### Artifact 3: Two-milestone build plan
-
-- **Form:** Prose in chat.
-- **Purpose:** Define the minimum sequence to make the case study true.
-- **Contents:**
-  - **Milestone 1 — Schema refactor.** Define `BusinessPlanSection` types, switch to structured outputs API, rewire Word export to render from schema.
-  - **Milestone 2 — Critic pass.** Second call per section with `{severity, section_id, claim, suggestion}` output; UI filter (medium+); accept/edit/ignore.
-- **Status:** Delivered conversationally. Not yet implemented in code.
-
-### Artifact 4: This handover document
-
-- **Form:** Markdown.
-- **Purpose:** Allow another LLM agent to pick up Forge work with zero prior context.
-- **Status:** Being produced now.
+| File | Purpose |
+|------|---------|
+| `api/schema.py` | Pydantic `BusinessPlan` + `CritiqueResponse` + `RegenerateRequest` + `InvestorQuestionsResponse` models — single source of truth |
+| `api/index.py` | FastAPI app: all routes (`generate`, `critique`, `regenerate`, `investor-questions`, `export`, `export-pdf`, `health`) |
+| `api/export.py` | `python-docx` export registered on the FastAPI app |
+| `api/export_pdf.py` | `fpdf2` PDF export registered on the FastAPI app |
+| `pages/index.tsx` | Main UI: state machine, SSE reader, plan/critique/questions/regenerate/download |
+| `components/plan/PlanRenderer.tsx` | Schema-driven section renderer with regenerate buttons |
+| `components/plan/CritiqueOverlay.tsx` | Per-section critique display with severity badges, accept/dismiss |
+| `lib/schema/business-plan.ts` | TS types mirroring Pydantic schema, `SectionId`, `SectionsState`, `Critique`, display names |
+| `pages/api/` | All Next.js proxies (thin — no business logic) |
+| `styles/globals.css` | Design system: CSS vars, keyframes, plan section styles, critique styles |
+| `evals/` | 8 JSON fixtures + `run_eval.py` evaluation script |
+| `docs/critic-rubric.md` | Severity rubric: what counts as low/medium/high |
 
 ---
 
 ## 7. Key Decisions & Reasoning
 
-### Decision: Schema-first, not prompt-first
+### Decision: Schema-first, not prompt-first ✅
 
-- **Why:** Asking a model to "produce a business plan" and parsing prose is a worse engineering signal than constraining the model to a shape and trusting it to fill the shape.
-- **Tradeoff:** Half-day to a day of refactoring vs. continued prose parsing.
-- **Status:** Decided. Not yet executed.
+- **Why:** Constraining the model to a shape is a stronger engineering signal than parsing prose.
+- **Status:** Shipped in M1.
 
-### Decision: Two separate LLM calls, not one prompt with "now critique yourself"
+### Decision: Two separate LLM calls, not self-critique ✅ (LOCKED)
 
 - **Why:** A model defends what it just wrote. Self-critique is shallow.
-- **Tradeoff:** Extra API call per section ↔ meaningful critique quality.
 - **Status:** Locked. Do not revisit.
 
-### Decision: Critic tone via structured severity field, NOT tone-of-voice prompt
+### Decision: Critic tone via structured severity field, NOT tone-of-voice prompt ✅ (LOCKED)
 
-- **Why:** Tone prompts produced either too-mean or encouraging-but-useless output. Severity + UI filtering keeps the critic sharp while protecting the founder from low-signal noise at the wrong moment.
-- **Tradeoff:** More schema complexity ↔ better user experience.
+- **Why:** Tone prompts produced either too-mean or encouraging-but-useless output. Severity + UI filtering keeps the critic sharp while protecting the founder.
 - **Status:** Locked. **This is the most defensible design decision in the project.**
 
-### Decision: No persistence by default
+### Decision: No persistence by default (LOCKED)
 
 - **Why:** Founder plans are sensitive. Simplest privacy posture has nothing to leak.
-- **Tradeoff:** No "resume later" UX ↔ no auth, no DB, no compliance surface.
 - **Status:** Locked. Revisit only if a real user asks.
 
-### Decision: FastAPI for orchestration, Next.js for UI
+### Decision: FastAPI for orchestration, Next.js for UI ✅
 
-- **Why:** Keep orchestration off the edge. Frontend stays a UI, not a half-implemented agent host.
-- **Status:** Decided as direction. Implementation status unconfirmed.
+- **Why:** Keep orchestration off the edge. Frontend stays a UI, not an agent host.
+- **Status:** Shipped in M1.
 
-### Decision: Build order — structured outputs FIRST, then critic
+### Decision: Build structured outputs BEFORE critic ✅
 
-- **Why:** If the critic is built before structured outputs, both are rebuilt during the refactor. With schemas in place, the critic can consume typed sections and emit structured per-section feedback directly.
-- **Status:** Locked. Confirmed by user.
+- **Why:** If critic is built before schemas, both are rebuilt during the refactor.
+- **Status:** Executed in this order. Locked.
+
+### Decision: One call, whole-plan structured output (not per-section calls)
+
+- **Why:** Simpler wire format, lower latency, model sees full context for coherence.
+- **Status:** Shipped.
+
+### Decision: 10 industry-standard sections (not 7 custom)
+
+- **Why:** Executive Summary, Problem, Solution, Market Analysis, Business Model, GTM Strategy, Competitive Landscape, Team, Financial Projections, The Ask — aligns with what investors expect.
+- **Status:** Shipped.
+
+### Decision: Critic triggered by explicit button (not automatic)
+
+- **Why:** Saves API calls. Lets user review before deciding to critique.
+- **Status:** Shipped.
+
+### Decision: Accept = mark accepted & hide (not auto-rewrite)
+
+- **Why:** Section regeneration is a separate feature. Accepting a critique shouldn't silently rewrite.
+- **Status:** Shipped.
+
+### Decision: PDF export via fpdf2 (not Puppeteer)
+
+- **Why:** Lighter dependency. No headless browser needed server-side.
+- **Status:** Shipped.
+
+### Decision: Regenerate sends rest of plan as context
+
+- **Why:** Keeps coherence across sections when regenerating one.
+- **Status:** Shipped.
 
 ### Decision (forward-looking): Independent versioning of drafter and critic
 
 - **Why:** They're conceptually independent — different prompts, different contexts, different goals — and should not share a release cadence.
-- **Status:** Forward-looking. The user has not yet built the coupled version. This belongs in the "what I'd do differently" reflection AFTER the coupled version ships, not before.
+- **Status:** Not yet implemented. Currently a coupled pipeline. The split belongs in "what I'd do differently" AFTER the coupled version has been evaluated in production.
 
 ---
 
-## 8. Current Active Focus
+## 8. Architecture Gotchas
 
-### What the user is doing right now
+### Two-process dev workflow
 
-**Pre-implementation strategic planning.** The user has:
+Running `npm run dev` without FastAPI on :8000 will give connection errors. Use `npm run dev:all` or run both processes manually.
 
-1. A working MVP (idea → plan → Word).
-2. A drafted case study describing the polished future state.
-3. A clear ranked list of recommendations to bridge the gap.
-4. Just received external critique (this conversation) confirming the sequencing.
+### SSE wire format
 
-### Latest discussion points
+`/api/generate` streams JSON SSE events: `{type: "section_start", section, index}`, `{type: "section_data", section, data}`, `{type: "section_complete", section, data, index}`, `{type: "error", code, message}`, and `data: [DONE]`. The client in `pages/index.tsx` parses this exact format. Both sides must stay in sync.
 
-- Confirmed: case study = future state, recommendations = path to that state.
-- Confirmed: structured outputs refactor is the next concrete unit of work.
-- Confirmed: critic comes second, not first.
-- Unresolved: whether to start the schema refactor immediately or revise the case study first.
+### TiltCard 3D nesting
 
-### Immediate priorities (for the next conversation)
+`pages/index.tsx` — the `TiltCard` separates the rotating transform layer from the styled card so `overflow: hidden` doesn't break the 3D context. **Preserve this nesting** if refactoring.
 
-1. **Define the `BusinessPlanSection` schema** — what sections, what typed fields per section, what's the minimum useful shape.
-2. **Choose the OpenAI model** for structured outputs (not yet specified in conversation — needs to be picked).
-3. **Decide where orchestration runs today** vs. where it should run after the refactor.
-4. Decide whether the user wants the next agent to write code, or continue advisory/planning work.
+### Schema is the rendering contract
+
+`PlanRenderer` renders typed fields from `SectionsState`, not parsed markdown. If you add a section or field to `api/schema.py`, you must:
+1. Add the matching type to `lib/schema/business-plan.ts`
+2. Add a renderer entry in `components/plan/PlanRenderer.tsx`
+3. Add the section heading to `SECTION_DISPLAY_NAMES` in both files
+
+### Optional input fields
+
+Industry, Stage, and Target Market are optional collapsible fields under the textarea. They default to hidden. These are sent to `/api/generate` as optional parameters.
+
+### Next.js version
+
+Next.js 16.2.4 with React 19 on Pages Router (not App Router). Has breaking changes from training data versions — read `node_modules/next/dist/docs/` before writing code.
+
+---
+
+## 9. Commands & Dev Setup
+
+- `npm run dev:all` — start both FastAPI + Next.js concurrently (production dev workflow)
+- `npm run dev` — Next.js only (requires FastAPI running separately on :8000)
+- `npm run dev:api` — FastAPI only (uvicorn, :8000)
+- `npm run build` — Next.js production build
+- `npm run lint` — ESLint (flat config, `eslint.config.mjs`)
+- No test framework is configured.
+
+**Required env vars:**
+- `OPENAI_API_KEY` — read by FastAPI. `/api/generate` returns 500 if unset.
+- `FASTAPI_URL` — defaults to `http://localhost:8000`. Set if FastAPI runs elsewhere.
+
+**Python:** venv at `.venv/`. Deps: fastapi, uvicorn, openai>=1.40, pydantic>=2.0, python-docx, fpdf2, slowapi.
+
+---
+
+## 10. Current Active Focus
+
+### What the project state is now
+
+**All planned milestones are shipped.** The codebase is feature-complete against the case-study spec. M1 (schema refactor), M2 (critic agent), and M3 (PDF, regen, eval, investor questions) are all built and compiling clean.
+
+### Immediate next priorities
+
+1. **Run the eval suite** (`cd evals && python run_eval.py` with FastAPI running) to verify end-to-end quality.
+2. **End-to-end manual test:** start FastAPI + Next.js, generate a plan, critique it, regenerate a section, download `.docx` and `.pdf`.
+3. **Commit and push** to `dev` branch.
+4. Decide on deployment (no CI/CD or hosting is set up yet).
 
 ### Open technical questions
 
-- Which section shape best fits "credible early-stage business plan"? (Industry-standard 10 sections? Custom 6–8?)
-- One LLM call per section, or one call with the full plan schema?
-- How to scope the critic's context — full plan, single section, or section + adjacent sections?
-- Streaming implementation: SSE, websockets, or chunked HTTP?
-- How will Word/PDF rendering be templated from the schema? (Direct HTML→PDF? Pandoc? docxtemplater?)
-
----
-
-## 9. Pending Tasks & Next Steps
-
-### Immediate (next session)
-
-1. **Confirm or define section schema.** Output: a TypeScript or Pydantic schema for `BusinessPlanSection[]`.
-2. **Refactor generator** to use OpenAI Structured Outputs API against that schema.
-3. **Rewire Word export** to render from the schema instead of prose.
-
-### Short-term (1–2 weeks)
-
-1. **Build the critic agent** — separate prompt, separate OpenAI call, structured output with `{severity, section_id, claim, suggestion}`.
-2. **Build the critic UI** — inline suggestions per section, medium+ shown by default, low collapsed, accept / edit / ignore actions.
-3. **Add streaming** — sections appear as they complete.
-
-### Medium-term (2–4 weeks)
-
-1. **PDF export** from the schema.
-2. **Section regeneration with context** — single-section regen with the rest of the plan in context.
-3. **Tiny eval suite** — 5–10 fixtures, before/after critic outputs, manual rubric. Without this, "the critic is tuned" is unverified.
-4. **Investor-question generation** — lowest-priority feature.
-
-### Strategic / portfolio
-
-1. Get a real usage number for the "founders used it" claim, or remove it from the case study.
-2. After the coupled drafter+critic ships, attempt the independent-versioning split — only then is "what I'd do differently" honest retrospective rather than borrowed wisdom.
-3. Decide whether to upgrade the "two agents" to a real agent loop (tool use, looped critique-until-quality-bar) as the next portfolio iteration.
-
-### Documentation pending
-
-- API surface for the FastAPI orchestration layer.
-- Section schema definition.
-- Critic prompt (the actual text).
-- Severity rubric — what counts as low vs. medium vs. high.
-
-### Risks to monitor
-
-- **Risk:** Critic tone regression. Each prompt change can swing tone back to mean or back to useless. Eval suite mitigates this.
-- **Risk:** Schema rigidity. If section shape is too narrow, generation feels generic; too loose, structured outputs lose value.
-- **Risk:** Case study credibility gap. The longer the case study describes features that aren't shipped, the worse the gap reads if surfaced.
-- **Risk:** "Two agents" overclaim. Receiving agent / future readers may expect a true agent loop and find a pipeline. Frame honestly.
+- Whether to upgrade "two agents" to a true agent loop (tool use, looped critique-until-quality-bar) as a next portfolio iteration.
+- Whether to add persistence / accounts (locked: no, until a real user asks).
+- Deployment target (Vercel for Next.js? Separate FastAPI hosting? Docker?)
 
 ---
 
@@ -392,17 +400,8 @@ The polished case study currently reads as if these are shipped. **They are not.
 
 ### User profile (preserve)
 
-- **Email:** <swint.ai07@gmail.com>
 - **Working context:** Building Forge as a personal product with explicit portfolio/career intent — positioning toward "agent track" engineering work.
-- **Other in-flight project (from memory, not this session):** "Chill 'n' Chow" food-ordering app design paused at Home screen Section 2 (Figma).
-- **Account constraint (from memory):** Figma is on Starter plan with capped MCP tool calls — warn before large design jobs. Not relevant to Forge directly but preserved.
-
-### Communication preferences
-
-- **Direct and opinionated.** The user does not want hedged feedback. Sharp critiques over polite encouragement.
-- **Structured.** Bullets, tables, ranked lists land better than flowing prose.
-- **Concrete over abstract.** Specific decisions, file references, schema shapes. Not "consider improving structure" — "define `BusinessPlanSection` with these fields."
-- **Honest about scope.** When the user calls something "multi-agent," push back if it's actually a pipeline. The user values being told the truth about engineering claims.
+- **Communication preferences:** Direct and opinionated. Bullets, tables, ranked lists over flowing prose. Sharp critiques over polite encouragement. Honest about scope.
 
 ### Output style currently active
 
@@ -421,20 +420,22 @@ The polished case study currently reads as if these are shipped. **They are not.
 
 ### Locked decisions (do not re-debate)
 
-- Two separate LLM calls, not self-critique.
-- No persistence by default.
-- Severity field, not tone-of-voice prompt, for critic tuning.
-- Build structured outputs BEFORE building the critic.
-- Frontend stays a UI; orchestration lives in FastAPI.
+1. Two separate LLM calls, not self-critique.
+2. No persistence, auth, or DB. Privacy via absence.
+3. Severity field, not tone-of-voice prompt, for critic tuning.
+4. Build structured outputs BEFORE critic (already executed).
+5. Frontend stays a UI; orchestration lives in FastAPI.
+6. Single-input ingestion, not a wizard. Optional structured fields are an enhancement, not a wizard.
+7. "Two agents" = two sequential LLM calls with different prompts. Pipeline, not agent loop. Don't upgrade the language.
 
 ### Topics already explored (do not re-ask)
 
 - Whether to use a wizard vs. single-input — decided: single input.
 - Whether to add accounts — decided: no, until a user asks.
-- Whether to add a critic — decided: yes, after structured outputs.
-- Whether the case study describes current or future state — clarified: future.
+- Whether to add a critic — decided: yes, shipped.
+- Whether the case study describes current or future state — it described future; now all claims are shipped.
 - Whether "two agents" is overclaiming — flagged: be honest, don't upgrade language.
-- Whether to do critique pass before or after structured outputs — decided: structured outputs first.
+- Whether to do critique pass before or after structured outputs — decided: structured outputs first, executed.
 
 ### Conventions to maintain
 
@@ -446,9 +447,9 @@ The polished case study currently reads as if these are shipped. **They are not.
 
 ### Strategic direction to preserve
 
-- The case study is both the spec and the acceptance criteria.
-- When every claim in the case study is true in the code, Forge ships its portfolio milestone.
-- The next portfolio milestone after that is upgrading "two agents" to a real agent loop — this is the bridge to the user's broader agent-track narrative.
+- The case study was both the spec and the acceptance criteria. All claims are now shipped in code.
+- The next portfolio milestone is upgrading "two agents" to a real agent loop — this is the bridge to the user's broader agent-track narrative.
+- Independent versioning of drafter and critic is a valid future improvement but should only be attempted after production evaluation of the coupled pipeline.
 
 ---
 
@@ -456,17 +457,80 @@ The polished case study currently reads as if these are shipped. **They are not.
 
 If you are picking up Forge from this document with no other context, here is your one-screen briefing:
 
-> Forge is a working MVP: founder enters a one-line idea, gets a business plan, downloads a Word doc. The user has written a polished case study describing a far more sophisticated system (typed section schemas, streaming, a separate critic agent with structured severity-tagged feedback, accept/edit/ignore UI, PDF export, FastAPI orchestration). **None of that is built yet.** The case study is the spec.
+> Forge is a feature-complete AI business plan generator. A founder enters a one-line idea (plus optional industry/stage/market), gets a 10-section plan streamed in, can critique it with a second LLM call that returns structured severity-tagged feedback, regenerate individual sections (with optional instruction), download as `.docx` or `.pdf`, and see likely investor questions. Everything is shipped and building clean.
 >
-> Two milestones turn the MVP into the case study:
+> Architecture: Next.js (UI + thin proxy) → FastAPI (orchestration + OpenAI calls). Two-process dev: `npm run dev:all`. Schema defined once in Pydantic, mirrored in TypeScript.
 >
-> 1. **Schema refactor** (half-day to a day): define `BusinessPlanSection` types, switch generation to OpenAI Structured Outputs, rewire Word export off the schema.
-> 2. **Critic pass**: second OpenAI call per section, different prompt, different context, outputs `{severity, section_id, claim, suggestion}`. UI shows medium+ by default.
+> Locked decisions: schema-first, two LLM calls (not self-critique), severity field (not tone prompt), no persistence, single-input (not wizard), pipeline (not agent loop).
 >
-> Do milestone 1 first. Do not build the critic before the schema. Do not let the critic self-critique. Do not change critic tone via prompt — use the severity field and UI filtering.
+> Three surfaces: **`/`** landing (marketing + engineering story), **`/app`** working tool with two-column layout, **`/demo`** pre-baked plan that works without an API key.
 >
-> The user wants direct, sharp, structured feedback in `★ Insight` blocks. Do not soften. Do not hedge. Do not re-ask settled questions (see §10).
+> Next steps: replace placeholder demo JSON with real frozen output (run `python evals/freeze_demo.py` with a real key), run evals, deploy.
+>
+> The user wants direct, sharp, structured feedback in `★ Insight` blocks. Do not soften. Do not hedge. Do not re-ask settled questions.
 
 ---
 
-*End of handover. Ready for next agent.*
+## 13. Lamborghini Visual Overhaul (2026-05-24)
+
+After the §12 redesign shipped, a second-pass visual overhaul applied the Lamborghini-inspired system from `design-md/DESIGN.md`. **The IA stays as §12** — three surfaces (`/`, `/app`, `/demo`), two-column app, PlanTOC rail, etc. **The look changes:**
+
+- **Tokens:** Cream/red replaced with absolute black canvas (`#000000`) + Lamborghini Gold (`#FFC000`) + pure white text + dark surfaces (`#181818`, `#202020`).
+- **Typography:** Fraunces/DM Sans/Newsreader replaced with Anton (display, condensed Neo-Grotesk-ish) + Inter (body). All display headings are uppercase with tight line-heights (0.92–1.05).
+- **Border radius:** Set to 0 across all buttons, cards, containers, and form elements per DESIGN.md §4 ("sharp angles are non-negotiable"). Only badges keep 2px.
+- **Shadows:** Removed everywhere; depth comes from surface layering (black → `#181818` → `#202020`) per DESIGN.md §6.
+- **Hover behavior:** Removed all scale/translate transforms; interactions are color-only (background + opacity shifts).
+- **Atmospheric effects:** Killed the cream radial-dot body pattern and the soft-red floating orb.
+
+Implementation lives in `styles/globals.css`: the `:root` token block was replaced wholesale; a large override layer at the end (`/* LAMBORGHINI DESIGN SYSTEM OVERRIDES */`) re-skins every component class. Class names were preserved exactly so existing Playwright selectors still resolve.
+
+**Bug discovered during the live-flow Playwright run:** The SSE `section_complete` event in `pages/api/index.ts` / `api/index.py` doesn't include the section's `data` field — only `section_data` does. The frontend was overwriting good streaming data with `undefined` on `section_complete`, causing the resulting `planData` to be malformed and `/api/critique` to return 422 on the first user-triggered critique. Fixed in `components/forge-app.tsx`: on `section_complete`, fall back to the previously-stored `currentSections[sid].data` when `event.data` is absent. This bug was masked by `/demo` (no streaming, full data via `getStaticProps`) and the prior Playwright tests (none ran the live flow).
+
+
+
+Shipped a portfolio-polish redesign on top of the working MVP. Detailed plan in `docs/redesign-proposal.md`. Active task tracking in `task.md`. What changed:
+
+### Three surfaces (was one page)
+
+- **`/`** — landing page. Hero with rotating word; "blank-page anxiety" problem block with verbatim case-study quote; 3-card "how it works" exhibit (schema-first / two-call pipeline / severity-tagged); demo preview strip; locked-decisions grid; footer CTA. Components in `components/landing/`.
+- **`/app`** — application. Refactored to two-column at ≥1024px: left rail holds concept-banner + `PlanTOC` (scroll-spy, status pills, click-to-scroll) + `CritiqueSummary` (severity bar with jump-to-first) + `ActionStack` (grouped Export / Analyze / Reset). Mobile: TOC collapses to dropdown (`PlanTOCDropdown`). Main column unchanged (`PlanRenderer` still renders typed fields).
+- **`/demo`** — pre-baked plan that works with no API key. Uses static fixture in `lib/fixtures/demo-plan.json` via `getStaticProps`. Downloads functional; critique/regenerate disabled with hint.
+
+### New components
+
+| File | Purpose |
+|------|---------|
+| `components/forge-app.tsx` | Application UI extracted from `pages/index.tsx` so multiple routes can mount it |
+| `components/layout/Nav.tsx` | Extracted nav (shared by `/`, `/app`, `/demo`) |
+| `components/landing/Landing.tsx` | All landing-page blocks |
+| `components/plan/PlanTOC.tsx` | `PlanTOCRail` + `PlanTOCDropdown` + `useScrollSpy` + `scrollToSection` helpers |
+| `components/plan/CritiqueSummary.tsx` | Severity counts, stacked bar, click-to-jump |
+| `components/plan/ActionStack.tsx` | Grouped action buttons (replaces flat done-bar) |
+| `components/plan/RegenerateButton.tsx` | Section-header popover: preset instructions or free-text, sends to `/api/regenerate` |
+| `components/plan/InvestorQuestionCard.tsx` | Question card with anchor-jump to its `section_id` |
+
+### New surfaces
+
+- `pages/app.tsx`, `pages/demo.tsx` — new routes (existing `pages/index.tsx` reused as landing)
+- `lib/fixtures/demo-plan.json` — frozen demo data (currently **hand-curated placeholder**; swap with real frozen output by running `python evals/freeze_demo.py` after putting a real key in `.env`)
+- `evals/freeze_demo.py` — captures real frozen JSON from a fixture or free-text idea
+
+### Other changes
+
+- `pages/_app.tsx` — wrapped in `<MotionConfig reducedMotion="user">` to respect OS setting
+- `styles/globals.css` — added `prefers-reduced-motion` rules; universal `:focus-visible`; touch-target sizing on mobile; landing/demo/rail/popover/action styles (kept all existing tokens and keyframes unchanged)
+- `api/index.py` — added `load_dotenv(override=True)` so `.env` is loaded on uvicorn reload
+
+### Tests
+
+Playwright e2e suite at `tests/e2e/` covering landing, demo, and `/app` idle state. Config: `playwright.config.ts`. Run with `npm run test:e2e` (or `... --headed` to watch in a real browser). Tests pass clean across desktop chromium and mobile webkit; full-flow test gated on `RUN_FULL_FLOW=1` env var because it requires a real OpenAI key.
+
+### Known gaps (specific to the redesign)
+
+- ~~Demo JSON is hand-curated~~ **Resolved.** `lib/fixtures/demo-plan.json` now contains real `gpt-4.1-mini` output (childcare cooperative fixture). Captured via `python evals/freeze_demo.py`.
+- **OpenAI Structured Outputs schema gotcha:** Pydantic's default `model_json_schema()` is not strict-mode compatible. Fixed in `api/schema.py` with `_make_strict` (adds `additionalProperties: false` to every object) + `_root_strict` (strips `$ref` siblings like `description`). New Pydantic models destined for structured outputs MUST go through these normalizers.
+- Pre-existing warning: `pages/_document.tsx` uses `<title>` inside `<Head>` (Next.js prefers per-page `next/head`). Pre-redesign and not addressed here.
+
+---
+
+*End of handover. All milestones shipped. Redesign shipped. Pending: real demo JSON, eval run, deployment.*

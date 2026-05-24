@@ -40,7 +40,24 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# python (dormant FastAPI backend)
+# python
 /.venv/
 __pycache__/
 *.pyc
+
+# claude code — local user settings (permissions, prefs)
+.claude/
+
+# playwright — generated test artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# editor / OS noise
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+Thumbs.db
