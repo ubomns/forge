@@ -67,15 +67,15 @@ const sectionRenderers: Record<SectionId, SectionRenderer> = {
             <>
                 <div className="plan-tam-row">
                     <div className="plan-tam-card">
-                        <span className="plan-tam-label">TAM</span>
+                        <span className="plan-tam-label">Total Addressable Market</span>
                         <span className="plan-tam-value">{d.tam}</span>
                     </div>
                     <div className="plan-tam-card">
-                        <span className="plan-tam-label">SAM</span>
+                        <span className="plan-tam-label">Serviceable Addressable Market</span>
                         <span className="plan-tam-value">{d.sam}</span>
                     </div>
                     <div className="plan-tam-card">
-                        <span className="plan-tam-label">SOM</span>
+                        <span className="plan-tam-label">Serviceable Obtainable Market</span>
                         <span className="plan-tam-value">{d.som}</span>
                     </div>
                 </div>

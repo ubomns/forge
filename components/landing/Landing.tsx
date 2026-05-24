@@ -157,15 +157,15 @@ function DemoPreviewStrip() {
                     <div className="landing-preview-card-eyebrow">MARKET</div>
                     <div className="landing-preview-tam-row">
                         <div className="landing-preview-tam-card">
-                            <span className="landing-preview-tam-label">TAM</span>
+                            <span className="landing-preview-tam-label">Total Addressable Market</span>
                             <span className="landing-preview-tam-value">$48B</span>
                         </div>
                         <div className="landing-preview-tam-card">
-                            <span className="landing-preview-tam-label">SAM</span>
+                            <span className="landing-preview-tam-label">Serviceable Addressable Market</span>
                             <span className="landing-preview-tam-value">$3.2B</span>
                         </div>
                         <div className="landing-preview-tam-card">
-                            <span className="landing-preview-tam-label">SOM</span>
+                            <span className="landing-preview-tam-label">Serviceable Obtainable Market</span>
                             <span className="landing-preview-tam-value">$45M</span>
                         </div>
                     </div>

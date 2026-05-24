@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Forge">
+  <title>Forge</title>
+  <!-- Solid gold hexagon — visible on light and dark browser tab backgrounds -->
+  <path d="M16 2 L28 9.5 L28 22.5 L16 30 L4 22.5 L4 9.5 Z" fill="#FFC000" />
+  <!-- F mark cut from the gold in absolute black -->
+  <rect x="10" y="8" width="12" height="2.75" fill="#000000" />
+  <rect x="10" y="8" width="2.75" height="16" fill="#000000" />
+  <rect x="10" y="14" width="8" height="2.75" fill="#000000" />
+</svg>
