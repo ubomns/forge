@@ -393,6 +393,7 @@ export function ForgeApp() {
 
     const handleRegenerate = useCallback(async (sectionId: SectionId, instruction?: string) => {
         if (!planData) return;
+        setErrorMessage('');
         setSections(prev => ({
             ...prev,
             [sectionId]: { status: 'streaming', data: prev[sectionId]?.status === 'done' ? (prev[sectionId] as { data: BusinessPlan[SectionId] }).data : {} },
@@ -417,7 +418,11 @@ export function ForgeApp() {
             setPlanData(prev => prev ? { ...prev, [sectionId]: newSectionData } as BusinessPlan : null);
             setCritiques(prev => prev.filter(c => c.section_id !== sectionId));
         } catch (err) {
-            setErrorMessage(err instanceof Error ? err.message : 'Regeneration failed.');
+            const message = err instanceof Error ? err.message : 'Regeneration failed.';
+            // Surface the error: previously the catch set errorMessage but it was
+            // gated behind `status === 'error'`, so regen failures looked silent.
+            console.error('[forge] regenerate failed:', err);
+            setErrorMessage(message);
             setSections(prev => ({
                 ...prev,
                 [sectionId]: prev[sectionId]?.status === 'streaming'
@@ -719,13 +724,22 @@ export function ForgeApp() {
                                 </motion.article>
                             )}
 
-                            {status === 'error' && errorMessage && (
+                            {errorMessage && (
                                 <motion.div
                                     className="plan-error"
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
+                                    role="alert"
                                 >
-                                    {errorMessage}
+                                    <span>{errorMessage}</span>
+                                    <button
+                                        type="button"
+                                        className="plan-error-dismiss"
+                                        onClick={() => setErrorMessage('')}
+                                        aria-label="Dismiss error"
+                                    >
+                                        &times;
+                                    </button>
                                 </motion.div>
                             )}
 

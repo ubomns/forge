@@ -13,7 +13,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let upstream: Response;
     try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30_000);
+        // 90s — single-section regen with full-plan context + instruction can take
+        // 40–60s on gpt-4.1-mini for dense sections (Financials, GTM, Market). 30s
+        // was triggering false-positive timeouts on real regen calls.
+        const timeout = setTimeout(() => controller.abort(), 90_000);
         try {
             upstream = await fetch(targetUrl, {
                 method: 'POST',
