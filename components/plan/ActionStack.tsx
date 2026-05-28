@@ -6,7 +6,7 @@ interface ActionStackProps {
     hasPlan: boolean;
     critiqueStatus: CritiqueStatus;
     investorQuestionsStatus: InvestorQStatus;
-    onDownload: (format: 'docx' | 'pdf') => void;
+    onDownload: () => void;
     onCritique: () => void;
     onInvestorQuestions: () => void;
     onReset: () => void;
@@ -58,21 +58,12 @@ export function ActionStack({
                 <div className="action-stack-row">
                     <button
                         className="action-stack-btn action-stack-btn-primary"
-                        onClick={() => onDownload('docx')}
+                        onClick={onDownload}
                         disabled={!downloadsEnabled}
                         data-testid="action-download-docx"
                     >
                         <DownloadIcon />
-                        .docx
-                    </button>
-                    <button
-                        className="action-stack-btn action-stack-btn-dark"
-                        onClick={() => onDownload('pdf')}
-                        disabled={!downloadsEnabled}
-                        data-testid="action-download-pdf"
-                    >
-                        <DownloadIcon />
-                        .pdf
+                        Download .docx
                     </button>
                 </div>
             </div>

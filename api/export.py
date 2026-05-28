@@ -18,7 +18,10 @@ def _add_heading(doc: Document, text: str, level: int = 2) -> None:
 
 
 def _add_paragraph(doc: Document, text: str, style: str | None = None) -> None:
-    doc.add_paragraph(text, style=style)
+    p = doc.add_paragraph(text, style=style)
+    # Body prose reads more polished with justified alignment; bullets and
+    # headings keep their default left alignment.
+    p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
 
 def _add_bullet_list(doc: Document, items: list[str]) -> None:

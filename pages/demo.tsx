@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Nav } from '@/components/layout/Nav';
 import { PlanRenderer } from '@/components/plan/PlanRenderer';
 import { InvestorQuestionsList } from '@/components/plan/InvestorQuestionCard';
+import { slugifyIdea } from '@/lib/utils';
 import demoPlanJson from '@/lib/fixtures/demo-plan.json';
 import type {
     BusinessPlan,
@@ -65,12 +66,11 @@ export default function Demo({ demo }: DemoProps) {
         setDismissedCritiqueIds((prev) => new Set(prev).add(id));
     };
 
-    const download = async (format: 'docx' | 'pdf') => {
-        const endpoint = format === 'docx' ? '/api/export-docx' : '/api/export-pdf';
-        const filename = `forge-demo-plan.${format}`;
+    const download = async () => {
+        const filename = `${slugifyIdea(demo.input.description, 'forge-demo-plan')}.docx`;
         setDownloadError('');
         try {
-            const response = await fetch(endpoint, {
+            const response = await fetch('/api/export-docx', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(demo.plan),
@@ -153,17 +153,11 @@ export default function Demo({ demo }: DemoProps) {
                         transition={{ duration: 0.4, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
                     >
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <button className="download-btn" onClick={() => download('docx')} data-testid="demo-download-docx">
+                            <button className="download-btn" onClick={download} data-testid="demo-download-docx">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                                     <path d="M8 2v8m0 0l-3-3m3 3l3-3M2 12h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                 </svg>
-                                .docx
-                            </button>
-                            <button className="download-btn download-btn-secondary" onClick={() => download('pdf')} data-testid="demo-download-pdf">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                    <path d="M8 2v8m0 0l-3-3m3 3l3-3M2 12h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                                .pdf
+                                Download .docx
                             </button>
                             <span className="demo-disabled-hint" title="Re-running the critic or regenerating sections requires a live model call. Generate your own plan to use them.">
                                 Critique &amp; regenerate live in <Link href="/app" className="demo-banner-link">/app</Link>

@@ -18,6 +18,7 @@ import { CritiqueSummary } from '@/components/plan/CritiqueSummary';
 import { ActionStack } from '@/components/plan/ActionStack';
 import { InvestorQuestionsList } from '@/components/plan/InvestorQuestionCard';
 import { Nav } from '@/components/layout/Nav';
+import { slugifyIdea } from '@/lib/utils';
 import type {
     BusinessPlan,
     CritiqueWithId,
@@ -482,12 +483,11 @@ export function ForgeApp() {
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') generate();
     };
 
-    const handleDownload = async (format: 'docx' | 'pdf') => {
+    const handleDownload = async () => {
         if (!planData) return;
-        const endpoint = format === 'docx' ? '/api/export-docx' : '/api/export-pdf';
-        const filename = `forge-business-plan.${format}`;
+        const filename = `${slugifyIdea(description)}.docx`;
         try {
-            const response = await fetch(endpoint, {
+            const response = await fetch('/api/export-docx', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(planData),
