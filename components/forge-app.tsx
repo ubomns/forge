@@ -261,7 +261,7 @@ export function ForgeApp() {
             if (stage) body.stage = stage;
             if (marketContext.trim()) body.market_context = marketContext.trim();
 
-            const response = await fetch('/api', {
+            const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
@@ -487,7 +487,7 @@ export function ForgeApp() {
         if (!planData) return;
         const filename = `${slugifyIdea(description)}.docx`;
         try {
-            const response = await fetch('/api/export-docx', {
+            const response = await fetch('/api/export', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(planData),
