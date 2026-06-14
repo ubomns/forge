@@ -1,0 +1,38 @@
+{
+  "$comment": "Shared project settings for the Claude Code dev-team bundle. Command-level Bash permissions are project-global in Claude Code (they cannot be scoped per-agent the way OpenCode did). Per-agent capability is controlled by each agent's tools: allowlist in .claude/agents/*.md. Both MCP servers are disabled by default — remove from disabledMcpjsonServers to enable for the dev phase. outputStyle defaults the main session to the Engineering Lead orchestrator persona.",
+  "outputStyle": "Engineering Lead",
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npm test*)",
+      "Bash(npm install*)",
+      "Bash(npm ci*)",
+      "Bash(npx tsc*)",
+      "Bash(npx eslint*)",
+      "Bash(npx prettier*)",
+      "Bash(npx vitest*)",
+      "Bash(npx jest*)",
+      "Bash(npx playwright*)",
+      "Bash(npx cypress*)",
+      "Bash(pnpm *)",
+      "Bash(yarn *)",
+      "Bash(pytest*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git status*)",
+      "Bash(npm audit*)",
+      "Bash(pnpm audit*)",
+      "Bash(yarn audit*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)"
+    ],
+    "ask": [
+      "Bash(git push*)"
+    ]
+  },
+  "disabledMcpjsonServers": ["github", "jira"]
+}

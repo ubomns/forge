@@ -45,8 +45,9 @@ next-env.d.ts
 __pycache__/
 *.pyc
 
-# claude code — local user settings (permissions, prefs)
-.claude/
+# claude code — track the shared dev-team bundle (agents, skills, output styles,
+# settings.json); ignore only personal per-user local settings
+.claude/settings.local.json
 
 # playwright — generated test artifacts
 /test-results/
