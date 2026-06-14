@@ -58,7 +58,7 @@ The client in `pages/index.tsx` reads this exact format via EventSource / fetch 
 **Styling.**
 - Tailwind v4 via `@tailwindcss/postcss` (postcss.config.mjs). No `tailwind.config.*` — config lives in CSS via `@import "tailwindcss"` in `styles/globals.css`.
 - The bulk of the visual design is **bespoke CSS in `styles/globals.css`** (CSS variables for tokens, hand-written keyframes). Tailwind utility classes appear mainly in the shadcn-style primitives.
-- `components/ui/` follows the shadcn convention: `cn()` from `lib/utils.ts` (clsx + tailwind-merge), `cva` for variants, Radix `Slot` for `asChild`. Only `button.tsx` and `animated-hero.tsx` exist so far.
+- `components/ui/` uses `cn()` from `lib/utils.ts` (clsx + tailwind-merge) for class merging. Only `animated-hero.tsx` exists so far (its motion is `framer-motion`). The shadcn `cva` (class-variance-authority) and Radix `Slot` packages were removed as unused — re-add them if you introduce shadcn-style variant primitives (`button.tsx` etc.).
 - Motion is driven by `framer-motion` (v12). The `TiltCard` in `pages/index.tsx` separates the rotating transform layer from the styled card so `overflow: hidden` doesn't break the 3D context — preserve that nesting.
 
 **Path alias.** `@/*` → repo root (`tsconfig.json`). Import as `@/components/...`, `@/lib/utils`, etc.

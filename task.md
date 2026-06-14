@@ -57,7 +57,7 @@ pages/index.tsx  →  POST /api  →  pages/api/index.ts  →  OpenAI Chat Compl
 Per `Forge_Handover.md` §7 and §10:
 
 1. Two separate LLM calls (drafter + critic), **not** self-critique.
-2. **No persistence by default** — no auth, no DB, no saved drafts. Reconsidered only if a real user asks.
+2. ~~**No persistence by default** — no auth, no DB, no saved drafts.~~ **OVERRIDDEN 2026-06-11** — Pivoting to SaaS. Persistence, auth, and DB are now required for monetization (email capture, saved plans, paid tiers, team licensing).
 3. Critic tone via structured **`severity` field** (`low`/`medium`/`high`), **NOT** tone-of-voice prompt. UI defaults to medium+, low collapsed.
 4. **Build order: structured outputs FIRST, then critic.** Reverse means rebuilding both.
 5. Frontend stays a UI; orchestration intended to live in FastAPI (planned).
