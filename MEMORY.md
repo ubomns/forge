@@ -12,9 +12,9 @@ The team is mid-way through building the **Conversion Playbook + Multi-Provider 
 
 - **Planning is 100% done** (gates G1–G4: PRD, architecture, ADRs, WBS, design spec).
 - **Build is partial:** Sprint 0 (backend foundation) and Sprint 1 (landing stale-copy) are **committed and verified**.
-- **Gate G5 approved by user.** Security audit completed; 5 of 6 blocking findings fixed directly by Engineering Lead (see §9). qa-tester and code-reviewer tasks errored — need re-delegation.
-- **Resume at:** re-run qa-tester + code-reviewer on the fixed increment, then merge `chore/claude-dev-team` → `dev`, then **Alembic migrations** (ADR-002 leftover), then **Sprint 2**.
-- **Active branch:** `chore/claude-dev-team` (NOT pushed; off `dev`). Uncommitted security fixes present on branch.
+- **Gate G5 approved by user.** Security audit completed; 5 of 6 blocking findings fixed directly by Engineering Lead and committed (see §9). qa-tester and code-reviewer **Task tool calls fail repeatedly** — Engineering Lead must run verification directly or user must approve merge without specialist evidence.
+- **Resume at:** Engineering Lead runs e2e + manual review directly, or user approves merge to `dev` → then **Alembic migrations** (ADR-002 leftover), then **Sprint 2**.
+- **Active branch:** `chore/claude-dev-team` (NOT pushed; off `dev`). Security fixes committed as `fc8ba24`.
 
 To operate: start a Claude Code session in this repo (it auto-loads the **Engineering Lead** output style), set `/model claude-opus-4-8`, then say e.g. *"continue the verification gate"* or *"start Sprint 2."*
 
@@ -101,10 +101,11 @@ Integration completed in `api/index.py`: routers included, startup `init_db()`, 
 
 ## 5. RESUME POINT (do these next, in order)
 
-1. **Re-delegate qa-tester + code-reviewer** on the fixed S0+S1 increment:
-    - `qa-tester`: run the Playwright e2e suite (start servers; `RUN_FULL_FLOW` stays unset); confirm `landing.spec.ts` passes; **add auth + lead-capture tests** (signup/login/me, duplicate email generic 200, 401, auto-save; `/api/leads`).
-    - `code-reviewer`: review the S0+S1 diff (including the 5 security fixes applied).
-    - → merge `chore/claude-dev-team` → `dev` (G5 already approved by user).
+1. **Verification gate — specialist tasks failing:** `qa-tester` and `code-reviewer` Task tool calls error out repeatedly (no output). Engineering Lead must either:
+    - **Option A:** Run e2e suite + manual review directly (see §10 verification checklist).
+    - **Option B:** User approves merge to `dev` without specialist evidence (G5 already approved).
+    - If running directly: start servers (`npm run dev:all`), run `npm run test:e2e`, verify `landing.spec.ts` passes, manually inspect `api/auth.py`, `api/routers/auth.py`, `api/index.py` for the 5 security fixes.
+    - → merge `chore/claude-dev-team` → `dev`.
 2. **Alembic migrations (ADR-002)** — outstanding Sprint-0 item. Dev uses `init_db()`/`create_all`; prod needs Alembic scaffolding + first migration.
 3. **Wire `watermark.py` into `api/export.py` + `api/export_pdf.py`** (currently the helper is unused) — Sprint 3 task but easy to miss.
 4. **Sprint 2** — Auth UI (login/signup modals, auth-aware Nav, My Plans), **email-capture gate UI** before download, plan persistence UI, "save after 1 plan" gating.
