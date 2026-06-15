@@ -67,7 +67,7 @@ def _startup_init_db() -> None:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:3001"],
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    # allow_origin_regex removed — use explicit origin whitelist only (security audit)
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],

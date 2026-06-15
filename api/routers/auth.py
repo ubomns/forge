@@ -154,10 +154,8 @@ async def signup(
     # Check for existing user
     existing = db.query(User).filter(User.email == body.email).first()
     if existing is not None:
-        raise HTTPException(
-            status_code=409,
-            detail={"error": {"code": "EMAIL_EXISTS", "message": "An account with this email already exists"}},
-        )
+        # Return generic 200 to prevent user enumeration (security audit)
+        return {"message": "If this email is not registered, an account has been created"}
 
     # Create user
     user = User(
