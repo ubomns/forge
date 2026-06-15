@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 
 export function Nav() {
@@ -42,6 +43,11 @@ export function Nav() {
                     <rect x="10" y="14" width="8" height="2.75" fill="#FFC000" />
                 </svg>
                 <span className="nav-brand">Forge</span>
+            </div>
+            <div className="nav-links">
+                <Link href="/pricing" className="nav-link">
+                    Pricing
+                </Link>
             </div>
         </motion.nav>
     );

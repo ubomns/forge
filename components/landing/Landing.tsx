@@ -1,76 +1,80 @@
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Nav } from '@/components/layout/Nav';
 
-const ROTATING_WORDS = ['credible', 'specific', 'structured', 'defensible', 'yours'];
+const SPRING_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+/* --- Buyer-facing differentiation cards (replaces old LockedDecisions) --- */
+
+const DIFF_CARDS = [
+    {
+        title: 'Two agents, not one',
+        body: "A drafter writes your plan. A separate critic — different prompt, zero knowledge of the drafter's reasoning — reviews it. Self-critique is shallow. Two calls catch what one never would.",
+    },
+    {
+        title: 'Schema-first output',
+        body: 'Your plan is a typed data structure with 10 investor-standard sections — not parsed markdown, not a wall of text. Every field is validated before you see it.',
+    },
+    {
+        title: 'Structured severity',
+        body: 'Every critique is tagged high, medium, or low. You see what matters first. The critic stays sharp without being mean or vague.',
+    },
+    {
+        title: 'Honest framing',
+        body: 'This is a pipeline: two sequential LLM calls with different prompts. Not an “autonomous agent.” Not magic. Just well-engineered first drafts.',
+    },
+];
+
+/* --- Hero (static, server-renderable) ----------------------------------- */
 
 function LandingHero() {
-    const [index, setIndex] = useState(0);
-    useEffect(() => {
-        const t = setInterval(() => setIndex((prev) => (prev + 1) % ROTATING_WORDS.length), 2200);
-        return () => clearInterval(t);
-    }, []);
-
     return (
         <section className="landing-hero">
-            <motion.div
-                className="landing-eyebrow"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            >
-                Business plan generator &middot; no account &middot; no persistence
-            </motion.div>
             <motion.h1
                 className="landing-h1"
                 initial={{ opacity: 0, y: 22, filter: 'blur(8px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ duration: 0.7, delay: 0.1, ease: SPRING_EASE }}
             >
-                First drafts that are{' '}
-                <span className="landing-h1-flip" aria-live="polite">
-                    <AnimatePresence mode="wait">
-                        <motion.span
-                            key={ROTATING_WORDS[index]}
-                            className="landing-h1-accent"
-                            initial={{ rotateX: 90, opacity: 0 }}
-                            animate={{ rotateX: 0, opacity: 1 }}
-                            exit={{ rotateX: -90, opacity: 0 }}
-                            transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
-                            style={{ display: 'inline-block', transformOrigin: '50% 50%' }}
-                        >
-                            {ROTATING_WORDS[index]}
-                        </motion.span>
-                    </AnimatePresence>
-                </span>
-                .
+                Your business idea, taken seriously.
             </motion.h1>
             <motion.p
                 className="landing-sub"
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ duration: 0.6, delay: 0.25, ease: SPRING_EASE }}
             >
-                Forge turns a one-line business idea into a typed, sectioned plan &mdash; then runs
-                a separate critic agent over it to catch what an investor would catch.
+                Forge turns one sentence into a structured, investor-ready business
+                plan&nbsp;&mdash; drafted by one AI agent, critiqued by another. No
+                templates. No blank pages. No averaging.
             </motion.p>
             <motion.div
                 className="landing-cta-row landing-cta-row-centered"
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ duration: 0.55, delay: 0.4, ease: SPRING_EASE }}
             >
                 <Link href="/app" className="landing-cta-primary" data-testid="landing-cta-generate">
-                    Generate your plan &rarr;
+                    Generate my plan &mdash; it&rsquo;s free &rarr;
                 </Link>
                 <Link href="/demo" className="landing-cta-secondary" data-testid="landing-cta-demo">
-                    See the demo &rarr;
+                    See a sample plan first &rarr;
                 </Link>
             </motion.div>
+            <motion.p
+                className="landing-audience"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.55, ease: SPRING_EASE }}
+            >
+                Built for early-stage founders who need a credible first draft&nbsp;&mdash;
+                not a generic template, and not a $3,000 consultant.
+            </motion.p>
         </section>
     );
 }
+
+/* --- Problem ------------------------------------------------------------- */
 
 function ProblemBlock() {
     return (
@@ -91,6 +95,8 @@ function ProblemBlock() {
     );
 }
 
+/* --- How it works -------------------------------------------------------- */
+
 const HOW_CARDS = [
     {
         tag: '01 · Generation',
@@ -100,12 +106,12 @@ const HOW_CARDS = [
     {
         tag: '02 · Critique',
         title: 'Two separate LLM calls',
-        body: "A drafter generates the plan. A separate critic — different prompt, different context, no knowledge of the drafter's reasoning — reviews it. The model can't defend what another conversation just wrote.",
+        body: "A drafter generates the plan. A separate critic — different prompt, different context, no knowledge of the drafter's reasoning — reviews it. The model can’t defend what another conversation just wrote.",
     },
     {
         tag: '03 · Severity',
         title: 'Tone via structure, not prompt',
-        body: 'Every critique is tagged high / medium / low. The UI shows medium-and-above by default; low collapses under "+N nits". Critic stays sharp without being mean.',
+        body: 'Every critique is tagged high / medium / low. The UI shows medium-and-above by default; low collapses under “+N nits”. Critic stays sharp without being mean.',
     },
 ];
 
@@ -124,7 +130,7 @@ function HowItWorks() {
                         initial={{ opacity: 0, y: 18 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true, margin: '-80px' }}
-                        transition={{ duration: 0.55, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                        transition={{ duration: 0.55, delay: i * 0.08, ease: SPRING_EASE }}
                     >
                         <div className="landing-how-tag">{c.tag}</div>
                         <h3 className="landing-how-title">{c.title}</h3>
@@ -135,6 +141,8 @@ function HowItWorks() {
         </section>
     );
 }
+
+/* --- Demo preview strip -------------------------------------------------- */
 
 function DemoPreviewStrip() {
     return (
@@ -205,60 +213,39 @@ function DemoPreviewStrip() {
     );
 }
 
-const DECISIONS = [
-    {
-        title: 'Two LLM calls, not self-critique',
-        body: 'A model defends what it just wrote. Self-critique is shallow. Two calls, two contexts.',
-    },
-    {
-        title: 'No persistence, by design',
-        body: 'No accounts, no DB, no saved drafts. Closing the tab loses the plan. Privacy via absence.',
-    },
-    {
-        title: 'Severity field, not tone prompt',
-        body: 'Tone-of-voice prompts produce either too-mean or encouraging-but-useless output. Structured severity does the job.',
-    },
-    {
-        title: 'Schema before critic',
-        body: 'Critic before structured outputs means rebuilding both. Build order matters.',
-    },
-    {
-        title: 'FastAPI for orchestration',
-        body: 'Frontend stays a UI, not an agent host. All LLM calls and schema validation live behind a single backend.',
-    },
-    {
-        title: '"Two agents" is a pipeline',
-        body: 'Sequential LLM calls with different prompts and contexts. Not a tool-use agent loop. Honest framing matters.',
-    },
-];
+/* --- Buyer differentiation (was LockedDecisions) ------------------------- */
 
-function LockedDecisions() {
+function BuyerDifferentiation() {
     return (
         <section className="landing-section landing-decisions">
-            <div className="landing-section-eyebrow">Locked design decisions</div>
-            <h2 className="landing-section-h2">What&apos;s deliberately not here.</h2>
+            <div className="landing-section-eyebrow">What makes it different</div>
+            <h2 className="landing-section-h2">
+                Not another template. Not another chatbot.
+            </h2>
             <p className="landing-section-body" style={{ maxWidth: 580 }}>
-                Each of these was decided once and locked. Worth seeing them written down &mdash;
-                the gaps are part of the design.
+                Four engineering decisions that shape every plan Forge generates.
             </p>
             <div className="landing-decisions-grid">
-                {DECISIONS.map((d, i) => (
-                    <motion.div
+                {DIFF_CARDS.map((d, i) => (
+                    <motion.article
                         key={d.title}
-                        className="landing-decision-card"
+                        className="buyer-diff-card"
+                        aria-labelledby={`diff-title-${i}`}
                         initial={{ opacity: 0, y: 14 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true, margin: '-60px' }}
-                        transition={{ duration: 0.5, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
+                        transition={{ duration: 0.5, delay: i * 0.06, ease: SPRING_EASE }}
                     >
-                        <h4 className="landing-decision-title">{d.title}</h4>
-                        <p className="landing-decision-body">{d.body}</p>
-                    </motion.div>
+                        <h4 id={`diff-title-${i}`} className="buyer-diff-title">{d.title}</h4>
+                        <p className="buyer-diff-body">{d.body}</p>
+                    </motion.article>
                 ))}
             </div>
         </section>
     );
 }
+
+/* --- Footer CTA ---------------------------------------------------------- */
 
 function FooterCTA() {
     return (
@@ -268,19 +255,21 @@ function FooterCTA() {
                 className="landing-section-body"
                 style={{ maxWidth: 480, marginInline: 'auto', textAlign: 'center' }}
             >
-                One sentence to start. No account. No saved drafts.
+                One sentence to start. Your first plan is free.
             </p>
             <div className="landing-cta-row landing-cta-row-centered">
                 <Link href="/app" className="landing-cta-primary">
-                    Generate your plan &rarr;
+                    Generate my plan &mdash; it&rsquo;s free &rarr;
                 </Link>
                 <Link href="/demo" className="landing-cta-secondary">
-                    See the demo &rarr;
+                    See a sample plan first &rarr;
                 </Link>
             </div>
         </section>
     );
 }
+
+/* --- Landing page shell -------------------------------------------------- */
 
 export function Landing() {
     return (
@@ -291,7 +280,7 @@ export function Landing() {
                 <ProblemBlock />
                 <HowItWorks />
                 <DemoPreviewStrip />
-                <LockedDecisions />
+                <BuyerDifferentiation />
                 <FooterCTA />
             </main>
         </div>
