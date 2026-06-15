@@ -1,7 +1,12 @@
 # ADR-008: No Migration of Anonymous Session Plans on Signup
 
 **Date:** 2026-06-11
-**Status:** Proposed
+**Status:** Superseded by ADR-009 (2026-06-15)
+
+> **Superseded.** Gate G1 reversed this decision. The anonymous in-session plan
+> is now auto-saved to the new account on signup. See
+> [ADR-009](ADR-009-auto-save-on-signup.md). The original content below is
+> retained for history; do not implement it.
 
 ## Context
 

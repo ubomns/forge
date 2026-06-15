@@ -1,7 +1,17 @@
 # ADR-003: Stripe Checkout Hosted Flow
 
 **Date:** 2026-06-11
-**Status:** Proposed
+**Status:** Superseded by ADR-013 (2026-06-15)
+
+> **Superseded by [ADR-013](ADR-013-multi-provider-billing.md).** Billing scope
+> changed at Gate G2 to **multi-provider, user-selected** (Stripe USD **+**
+> Paystack NGN). Stripe is **retained** as one of two providers; the hosted
+> Checkout + Customer Portal design below still applies to the Stripe path. What
+> changed: there is now a provider-agnostic `BillingProvider` seam in FastAPI,
+> the user picks the provider at checkout, and a second webhook boundary
+> (Paystack) exists. Read this ADR's body for the Stripe-specific rationale, then
+> ADR-013 for the multi-provider design. The body below is retained unchanged for
+> the historical record.
 
 ## Context
 

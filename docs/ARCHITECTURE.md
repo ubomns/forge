@@ -1,9 +1,9 @@
 # Forge — SaaS Pivot Architecture
 
-**Status:** Proposed  
-**Date:** 2026-06-11  
+**Status:** Proposed (SaaS pivot) + Conversion Playbook extension Accepted (§9A, 2026-06-15) + Multi-Provider Billing Accepted (§9A.12, 2026-06-15)  
+**Date:** 2026-06-11 (pivot); extended 2026-06-15 (conversion playbook); extended 2026-06-15 (multi-provider billing)  
 **Author:** Solution Architect  
-**Scope:** Pivot from free, no-persistence tool to monetized SaaS with tiered access, auth, persistence, and Stripe payments.
+**Scope:** Pivot from free, no-persistence tool to monetized SaaS with tiered access, auth, persistence, and payments. **§9A** extends this with the conversion-playbook scope (auto-save on signup, three.js/GSAP landing, `/pricing` route, watermark referral attribution) per Gate G1 and ADR-009…ADR-012. **§9A.12** extends billing from Stripe-only to **multi-provider (Stripe USD + Paystack NGN, user-selected at checkout)** per Gate G2 and ADR-013 (which supersedes ADR-003).
 
 ---
 
@@ -18,6 +18,7 @@
 7. [Threat Model (STRIDE)](#7-threat-model-stride)
 8. [Tech Stack](#8-tech-stack)
 9. [Trade-off Analysis (ATAM)](#9-trade-off-analysis-atam)
+9A. [Conversion Playbook Extension (2026-06-15)](#9a-conversion-playbook-extension-2026-06-15)
 10. [Migration Plan](#10-migration-plan)
 11. [Deliberately Out of Scope](#11-deliberately-out-of-scope)
 12. [Appendix: ADR Index](#12-appendix-adr-index)
@@ -1068,6 +1069,611 @@ A trade-off point is a decision where improving one quality attribute worsens an
 
 ---
 
+## 9A. Conversion Playbook Extension (2026-06-15)
+
+> **Scope.** This section extends the SaaS-pivot architecture above with the
+> conversion-playbook requirements (`docs/PRD-conversion-playbook.md`) and the
+> decisions locked at **Gate G1**. It reconciles with ADR-001…ADR-008 and adds
+> ADR-009…ADR-012. Where the pivot architecture already covers an item (auth,
+> persistence, Stripe, watermark, rate limiting), this section adds only the
+> *delta*; it does not restate the baseline. Read with §§1–9 above.
+
+### 9A.1 G1 Locked Decisions (carried forward — design HOW, not WHETHER)
+
+| # | Locked decision | ADR | Effect on this architecture |
+|---|---|---|---|
+| 1 | **Auto-save the in-session plan on signup** | ADR-009 (supersedes ADR-008) | Signup/OAuth handlers accept an optional `current_plan`; user + plan persisted in one transaction |
+| 2 | **Landing rebuilt with three.js + GSAP** (user-locked tech) | ADR-010 | Client-only, lazy, capability/reduced-motion-gated hero canvas; static-first markup |
+| 3 | **Separate `/pricing` route** (real page, not anchor) | ADR-012 | New static `pages/pricing.tsx`; reuses ADR-003 checkout |
+| 4 | **Demo fixture unchanged for now** (childcare-swap) | — | No architecture; landing `DemoPreviewStrip` change is a copy/content task (M-P3), not structural |
+
+### 9A.2 Added Requirements Traceability
+
+**Functional (extends §2.1):**
+
+| ID | Requirement | Source | ADR |
+|---|---|---|---|
+| FR-15 | On signup/OAuth, the anonymous in-session plan is auto-saved to the new account | AC-F2.4, G1 #1 | ADR-009 |
+| FR-16 | Buyer-facing landing hero rendered with three.js + GSAP, lazy and client-only | G1 #2 | ADR-010 |
+| FR-17 | Dedicated `/pricing` route shows Free/Pro/Team with prices and per-tier CTAs | US-CP4 | ADR-012 |
+| FR-18 | Free-tier export watermark URL carries `?ref=export`; referral sessions attributable | US-CP7, G6 | ADR-011 |
+| FR-19 | Stale "no account / no persistence" copy removed before/with auth launch | US-CP1 | — (content) |
+| FR-20 | Landing demo preview + `/demo` fixture show the same scenario | US-CP3 | — (content) |
+
+**Non-Functional (extends §2.2):**
+
+| ID | Requirement | Source | ADR |
+|---|---|---|---|
+| NFR-13 | three.js/GSAP must not be in the landing initial chunk; 3D chunk ≤ ~200 KB gz; initial route JS growth ≤ ~10 KB gz | G1 #2 perf budget | ADR-010 |
+| NFR-14 | Landing degrades gracefully: no-SSR, no-WebGL, and `prefers-reduced-motion` all fall back to the static hero | Accessibility (WCAG 2.3.3) | ADR-010 |
+| NFR-15 | Watermark referral param carries no PII; treated as untrusted analytics input | Privacy | ADR-011 |
+| NFR-16 | `/pricing` renders statically without auth; tier definitions from one config | US-CP4, QA-M1 | ADR-012 |
+
+### 9A.3 Added Quality-Attribute Scenarios
+
+| ID | Scenario (source→stimulus→environment→response→measure) | Measure |
+|---|---|---|
+| QA-P5 | A visitor on a mid-tier laptop loads the landing page; the static hero (text + CTAs) is interactive before any 3D code runs | LCP unaffected by three.js; CTAs clickable pre-canvas |
+| QA-P6 | The 3D hero chunk loads only after guards pass | three.js/GSAP absent from initial chunk; chunk ≤ ~200 KB gz |
+| QA-A1 | A user with `prefers-reduced-motion: reduce` visits the landing page | No WebGL scene initialised; no GSAP timeline started; static hero shown |
+| QA-A2 | A user on a browser without WebGL visits the landing page | Static hero shown; no console error; page fully functional |
+| QA-CV1 | An anonymous user who generated a plan signs up | Plan present in "My plans" immediately after signup (auto-save) |
+| QA-CV2 | A visitor opens an exported plan URL with `?ref=export` | Lands on live landing page (200, not 404); analytics records `referral_source=export_watermark` |
+
+### 9A.4 Logical View — Delta
+
+New/changed components only (see §4.1 for the baseline diagram):
+
+```mermaid
+graph TB
+    subgraph Browser
+        LANDING["Landing (Pages Router)<br/>static-first markup"]
+        HEROSTATIC["HeroStatic<br/>SSR text + CTAs"]
+        HEROCANVAS["HeroCanvas (dynamic, ssr:false)<br/>three.js + GSAP"]
+        GUARD["Capability Guard<br/>reduced-motion / WebGL / perf"]
+        PRICING["/pricing page<br/>static, no auth"]
+        REFCAP["Referral capture<br/>?ref=export → analytics"]
+    end
+
+    subgraph NextJS["Next.js (:3000)"]
+        SUB_PROXY["/api/subscriptions/checkout (proxy)"]
+    end
+
+    subgraph FastAPI["FastAPI (:8000)"]
+        AUTH_API2["/api/auth/signup + /oauth/google<br/>+ optional current_plan (auto-save)"]
+        WMARK["watermark.py helper<br/>shared docx+pdf URL (?ref=export)"]
+        EXP2["/api/export + /api/export-pdf<br/>use watermark helper"]
+        SUB_API2["/api/subscriptions/checkout (ADR-003)"]
+    end
+
+    LANDING --> HEROSTATIC
+    LANDING -->|next/dynamic ssr:false| HEROCANVAS
+    HEROCANVAS --> GUARD
+    GUARD -->|fail any check| HEROSTATIC
+    LANDING --> REFCAP
+    PRICING -->|authed CTA| SUB_PROXY --> SUB_API2
+    AUTH_API2 --> WMARK
+    EXP2 --> WMARK
+```
+
+#### Added/changed component responsibilities
+
+| Component | Responsibility | Technology / Notes |
+|---|---|---|
+| **HeroStatic** | Server-rendered hero markup: headline, sub-headline, primary/secondary CTAs. The SEO/LCP and conversion surface. Always present. | Existing bespoke CSS + framer-motion (DOM) |
+| **HeroCanvas** | Decorative WebGL hero scene. `aria-hidden`. Dynamically imported (`ssr:false`), guarded, lifecycle-managed (pause off-screen, dispose on unmount). | `three`, `gsap` (to be added — verify on install) |
+| **Capability Guard** | Order: reduced-motion → WebGL probe → optional perf heuristic. Any failure ⇒ static hero only, no 3D/GSAP load. | Browser APIs (`matchMedia`, `getContext`) |
+| **`/pricing` page** | Static tier comparison; per-tier CTA wiring (Free→/app; Pro/Team→auth-then-checkout). No billing logic. | `pages/pricing.tsx`, `lib/pricing.ts` config |
+| **Referral capture** | Reads `?ref=export` on landing; records `referral_source=export_watermark`; optional first-touch persistence in sessionStorage. | Analytics pipeline (PRD dependency) |
+| **Auth handlers (changed)** | Accept optional `current_plan`; validate with `BusinessPlan`; insert user + plan in one transaction. | `api/routers/auth.py` (per ADR-009) |
+| **Watermark helper (new)** | Single source for the footer URL incl. `?ref=export`, used by both export modules. | `api/watermark.py` (per ADR-011) |
+
+### 9A.5 Process View — Delta
+
+#### 9A.5.1 Auto-Save on Signup (ADR-009 — supersedes the §4.2.3 "no migration" note)
+
+```mermaid
+sequenceDiagram
+    actor U as Anonymous User (has generated plan)
+    participant UI as Next.js UI (ForgeApp)
+    participant SS as sessionStorage
+    participant PROXY as Next.js Proxy
+    participant AUTH as FastAPI /api/auth/signup
+    participant DB as Database
+
+    U->>UI: Click "Sign up" (after generating a plan)
+    UI->>SS: Read current plan {plan_data, idea_description}
+    UI->>PROXY: POST /api/auth/signup {email, password, current_plan}
+    PROXY->>AUTH: Proxy request
+    AUTH->>AUTH: Validate password; hash (bcrypt)
+    AUTH->>AUTH: current_plan present? BusinessPlan.model_validate()
+    alt Plan valid
+        AUTH->>DB: BEGIN TX → INSERT user → INSERT plan(user_id) → COMMIT
+    else Plan absent/invalid
+        AUTH->>DB: INSERT user only (account still created)
+    end
+    AUTH->>AUTH: Create JWT (sub=user.id, tier=free, exp=7d)
+    AUTH-->>PROXY: 200 {user, saved_plan_id?} + Set-Cookie
+    PROXY-->>UI: 200 + Set-Cookie
+    UI->>SS: Replace working copy with saved_plan_id (avoid duplicate on next save)
+    UI->>UI: Logged in; plan visible in "My plans"
+```
+
+#### 9A.5.2 Landing Hero Load (ADR-010)
+
+```mermaid
+sequenceDiagram
+    actor V as Visitor
+    participant SSR as Next.js SSR/SSG
+    participant DOM as Browser DOM
+    participant DYN as next/dynamic loader
+    participant CV as HeroCanvas (three.js+GSAP)
+
+    V->>SSR: GET /
+    SSR-->>DOM: HTML incl. HeroStatic (text + CTAs)  [LCP, no 3D]
+    DOM->>DYN: Hydrate; request HeroCanvas chunk (ssr:false)
+    DYN->>CV: Mount HeroCanvas
+    CV->>CV: Guard: prefers-reduced-motion?
+    alt reduced motion OR no WebGL OR low-perf
+        CV-->>DOM: Render nothing extra (HeroStatic remains)
+    else capable
+        DYN-->>CV: Load three.js + gsap chunk (≤ ~200 KB gz)
+        CV->>CV: Init scene; cap DPR≤2; start GSAP timeline
+        CV->>CV: IntersectionObserver: pause when off-screen
+        CV-->>DOM: Decorative aria-hidden canvas behind hero
+    end
+```
+
+#### 9A.5.3 `/pricing` → Checkout (ADR-012 + ADR-003)
+
+```mermaid
+sequenceDiagram
+    actor V as Visitor
+    participant P as /pricing (static)
+    participant PROXY as Next.js Proxy
+    participant SUB as FastAPI /api/subscriptions/checkout
+    participant STRIPE as Stripe
+
+    V->>P: View pricing (no auth required)
+    alt Free tier CTA
+        V->>P: Click "Start free"
+        P-->>V: Navigate to /app
+    else Pro/Team CTA, unauthenticated
+        V->>P: Click "Upgrade to Pro"
+        P-->>V: Route to signup/login (intent=checkout&tier=pro preserved)
+        Note over V,P: After auth, resume checkout
+    else Pro/Team CTA, authenticated
+        V->>PROXY: POST /api/subscriptions/checkout {price_id, tier}
+        PROXY->>SUB: Proxy (authed)
+        SUB->>STRIPE: checkout.sessions.create
+        STRIPE-->>SUB: {url}
+        SUB-->>PROXY: 200 {checkout_url}
+        PROXY-->>V: Redirect to Stripe hosted Checkout
+    end
+```
+
+### 9A.6 Development View — Delta (new/changed files)
+
+| File | Change | Rationale / ADR |
+|---|---|---|
+| `components/landing/HeroStatic.tsx` | **New.** Server-rendered hero markup (text + CTAs). | ADR-010 (static-first) |
+| `components/landing/HeroCanvas.tsx` | **New.** three.js + GSAP scene; guarded, lifecycle-managed; imported via `next/dynamic({ssr:false})`. | ADR-010 |
+| `components/landing/Landing.tsx` | **Modified.** Compose HeroStatic + dynamic HeroCanvas; remove stale "no account / no persistence" copy (M-P1); update `DemoPreviewStrip` scenario (M-P3); add social-proof + distribution sections (UX-designer owns layout). | FR-19, FR-20 |
+| `pages/pricing.tsx` | **New.** Static tier-comparison page; CTA wiring. | ADR-012 |
+| `lib/pricing.ts` | **New.** Single tier/price/feature config + Stripe `price_id` map. | ADR-012, QA-M1 |
+| `lib/analytics.ts` | **New (or extend).** Capture `?ref=export`; emit `referral_source`, `pricing_page_view`, `checkout_initiated` events. | ADR-011, G6/G7 |
+| `api/watermark.py` | **New.** `watermark_url(tier)` shared helper incl. `?ref=export`. | ADR-011 (resolves SP-3) |
+| `api/export.py` | **Modified.** Use `watermark.py` for the .docx footer URL. | ADR-006, ADR-011 |
+| `api/export_pdf.py` | **Modified.** Use `watermark.py` in `_PlanPDF.footer()`. | ADR-006, ADR-011 |
+| `api/routers/auth.py` | **Modified.** Accept optional `current_plan`; validate + transactional insert. | ADR-009 |
+| `api/schema.py` | **Modified.** Add `current_plan` to signup/OAuth request models (optional `PlanCreateRequest`-shaped). | ADR-009 |
+| `next.config.ts` | **Verify.** No change needed for `next/dynamic` (it is a runtime API); keep dev rewrite. Add bundle-analyzer only if used for NFR-13 verification. | ADR-010 |
+| `package.json` | **Modified.** Add `three`, `gsap`, `@types/three` (dev). To be added — verify on install. | ADR-010 |
+
+### 9A.7 Data Architecture — Delta
+
+No new entities. Changes are confined to existing flows:
+
+| Flow | Data | Classification | Protection |
+|---|---|---|---|
+| Browser → FastAPI (signup w/ `current_plan`) | Email, password, full plan JSON | PII + business-sensitive | TLS; bcrypt; `BusinessPlan.model_validate()` before persist; transactional write (ADR-009) |
+| Exported doc → Browser (`?ref=export`) | Channel tag only (no PII) | Non-sensitive | Static tag; never an identifier (ADR-011, NFR-15) |
+| Browser → analytics (referral) | `referral_source`, page events | Behavioural, no direct PII | Subject to cookie consent (NFR-12); param treated as untrusted input |
+
+The `Plan` row created by auto-save is identical in shape to one created via
+`POST /api/plans`; it counts toward the ADR-005 free-tier 3-plan cap (first of 3).
+
+### 9A.8 Threat Model (STRIDE) — New Boundaries / Flows
+
+These extend §7. Boundaries already covered (Stripe webhook, DB, OpenAI, OAuth)
+are unchanged; only deltas are listed.
+
+#### Boundary: Anonymous client → `/api/auth/signup` carrying `current_plan` (ADR-009)
+
+| Asset / Flow | Threat | Description | Impact | Mitigation |
+|---|---|---|---|---|
+| `current_plan` payload | Tampering | Malformed/oversized plan JSON injected on an unauthenticated endpoint | Medium | `BusinessPlan.model_validate()` before persist; reject oversized bodies (existing request-size limit); invalid plan is skipped, not fatal |
+| `current_plan` payload | Denial of Service | Attacker floods signup with large plan blobs to exhaust DB/CPU | Medium | Rate limit signup by IP (existing 5/min); size cap; validation rejects junk cheaply |
+| Auto-save write | Elevation of Privilege | Submitted plan attached to a different/existing user | High | Plan written only to the **freshly created** user id inside the same TX; auto-save never fires on login of an existing account |
+| Signup transaction | Repudiation / consistency | Partial write leaves a user with no plan or a plan with no user | Medium | Single DB transaction (atomic); failure rolls back both |
+
+#### Boundary: Exported document URL `?ref=export` → landing page (ADR-011)
+
+| Asset / Flow | Threat | Description | Impact | Mitigation |
+|---|---|---|---|---|
+| `ref` query param | Tampering | Attacker crafts arbitrary `ref` values | Low | Treat as untrusted analytics label only; never used for authz, pricing, or feature gating (NFR-15); whitelist known values when reporting |
+| `ref` query param | Information Disclosure | Per-user data leaked in a shared document URL | Medium | Static `ref=export` tag only — **no** user/plan id embedded (ADR-011 decision #6) |
+| Watermark URL | Spoofing / brand | URL points to a 404 or wrong domain, eroding trust | Medium | `PUBLIC_BASE_URL` config must resolve live before ship (AC-CP7.2); single helper prevents drift |
+| Referral param | Repudiation (metric integrity) | Bots inflate `ref=export` sessions | Low | Bot filtering at the analytics layer; metric is directional, not billing-critical |
+
+#### Boundary: `/pricing` → checkout hop (ADR-012)
+
+| Asset / Flow | Threat | Description | Impact | Mitigation |
+|---|---|---|---|---|
+| Checkout intent param | Tampering | User edits `tier`/`price_id` in the resume-after-auth URL | Medium | Server maps `tier`→`price_id` from `lib/pricing.ts`/Stripe config; client `price_id` is validated against the allowed set, never trusted blindly |
+| `/pricing` page | Spoofing | Phishing clone of the pricing page | Low | Checkout always lands on Stripe-hosted (ADR-003) under verified domain; no card fields on Forge |
+
+#### Boundary: three.js/GSAP client chunk (ADR-010)
+
+| Asset / Flow | Threat | Description | Impact | Mitigation |
+|---|---|---|---|---|
+| 3D dependency chunk | Tampering (supply chain) | Compromised `three`/`gsap` package | Medium | Pin exact versions; `dependency-cve` audit on install; SRI/lockfile integrity; CI bundle-size + audit gate |
+| WebGL context | Denial of Service (self) | Runaway render loop / GPU leak degrades the user's own device | Low | Pause off-screen (IntersectionObserver) + on `visibilitychange`; dispose on unmount; cap DPR |
+
+### 9A.9 Tech Stack — Delta
+
+| Layer | Technology | Version | Requirement | Verification |
+|---|---|---|---|---|
+| 3D / WebGL | `three` | — | FR-16, NFR-13/14 | **To be added — verify on install**; pin exact version then record |
+| Animation (WebGL/scroll) | `gsap` | — | FR-16 | **To be added — verify on install**; pin exact version then record |
+| Types | `@types/three` (dev) | — | FR-16 (TS) | **To be added — verify on install** (GSAP ships its own types) |
+| Client loading | `next/dynamic` `{ ssr:false }` | bundled with Next 16.2.4 | FR-16, NFR-14 | **Verified** in `node_modules/next/dynamic.d.ts` (`DynamicOptions.ssr?: boolean`) |
+
+No new backend dependencies — auto-save, watermark helper, and pricing reuse the
+pivot stack (SQLAlchemy, Pydantic, Stripe, FastAPI).
+
+### 9A.10 Trade-off Analysis (ATAM) — Delta
+
+**Sensitivity points (extends §9.1):**
+
+| ID | Sensitivity Point | Quality Attribute | Rationale |
+|---|---|---|---|
+| SP-6 | Lazy-load + guard boundary for HeroCanvas | Performance, Accessibility | Where the `ssr:false`/guard line is drawn determines whether three.js ever touches first load, SSR, or reduced-motion users |
+| SP-7 | `watermark.py` single helper | Maintainability | One source for the footer URL prevents .docx/.pdf drift (resolves SP-3) |
+| SP-8 | Auto-save transaction boundary | Reliability | Atomicity of the user+plan insert determines whether a failed signup can orphan data |
+
+**Trade-off points (extends §9.2):**
+
+| ID | Decision | Improved | Worsened | Rationale |
+|---|---|---|---|---|
+| TP-7 | three.js/GSAP rich hero | Brand/conversion appeal | Bundle size, complexity | Heavy chunk justified only because it is lazy + guarded (ADR-010); CI must police NFR-13 |
+| TP-8 | Two animation libraries (framer-motion + GSAP) | Right tool per layer (DOM vs WebGL) | Cognitive/maintenance load | Accepted only if GSAP stays scoped to the canvas |
+| TP-9 | Auto-save on signup | Conversion (no work loss) | Plan JSON on an unauthenticated endpoint | Mitigated by validation + atomic write (ADR-009, STRIDE §9A.8) |
+| TP-10 | Static `ref=export` (channel-level) | Privacy, simplicity | No per-sharer attribution | Sufficient for G6 count metric (ADR-011) |
+
+**Risks (extends §9.3):**
+
+| ID | Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|---|
+| R-8 | three.js leaks GPU/memory or tanks fps on weak devices | Medium | Medium | DPR cap, off-screen pause, dispose-on-unmount; reduced-motion/WebGL guards (ADR-010) |
+| R-9 | Bundle regresses (three.js leaks into initial chunk) | Medium | High | `ssr:false` dynamic import; CI bundle-size budget (NFR-13); narrow imports |
+| R-10 | Watermark `PUBLIC_BASE_URL` 404s at launch | Low | Medium | Verify URL resolves before export modules ship (AC-CP7.2) |
+| R-11 | Auto-save fails silently and user loses plan | Low | High | Non-fatal but logged; return `saved_plan_id`; client surfaces a "saved" confirmation |
+| R-12 | Stale "no account" copy ships after auth (trust break) | Medium | High | Hard release gate AC-CP1.5: copy remediation deploys before/with auth (FR-19) |
+
+**Non-risks (extends §9.4):**
+
+| ID | Non-Risk | Rationale |
+|---|---|---|
+| NR-5 | New DB schema for the playbook | None required; reuses `User`/`Plan`; auto-save uses existing `Plan` shape |
+| NR-6 | three.js breaking SSR/SEO | `ssr:false` + static-first markup means SSR/SEO never see WebGL (ADR-010) |
+| NR-7 | Demo fixture re-architecture | G1 #4: demo unchanged for now; landing preview is a content swap, not structural |
+
+### 9A.12 Multi-Provider Billing Extension (2026-06-15, Gate G2 / ADR-013)
+
+> **Scope.** Extends the billing portion of this architecture from **Stripe-only**
+> (ADR-003) to **multi-provider, user-selected** (Stripe USD + Paystack NGN) per
+> Gate G2 and **ADR-013 (supersedes ADR-003)**. Delta only — auth, persistence,
+> tiers (ADR-005), `/pricing` route (ADR-012), and the webhook idempotency
+> principle (§7) are baselines; this section adds the provider seam, the Paystack
+> path, the second webhook boundary, and the data discriminator. FastAPI still
+> owns billing (ADR-004); `/pricing` still carries no billing logic (ADR-012).
+
+#### 9A.12.1 G2 Locked Decisions (design HOW, not WHETHER)
+
+| # | Locked decision | ADR | Effect on this architecture |
+|---|---|---|---|
+| 1 | **Both Stripe and Paystack offered; user picks provider at checkout** (Option B) | ADR-013 | New provider-choice step; `provider` flows from `/pricing`→checkout→`POST /api/subscriptions/checkout` |
+| 2 | **USD via Stripe, NGN via Paystack**; each paid tier needs a USD price AND an NGN price | ADR-013 | `lib/pricing` keyed tier × provider × currency |
+| 3 | **NGN amounts are config, not FX-derived** | ADR-013 | NGN values marked `TO CONFIRM (product owner)`; no hardcoded/derived number ships |
+| 4 | **Provider-agnostic `BillingProvider` seam in FastAPI** | ADR-013 | `api/billing/*`; rest of app is provider-neutral; one internal subscription state |
+
+#### 9A.12.2 Added Requirements Traceability
+
+**Functional (extends §2.1 / §9A.2):**
+
+| ID | Requirement | Source | ADR |
+|---|---|---|---|
+| FR-11′ | Checkout for Pro/Team is multi-provider; user selects Stripe (USD) or Paystack (NGN) | G2 | ADR-013 |
+| FR-21 | Paystack hosted checkout (redirect or inline popup) with Paystack **Plans** for subscriptions | G2 | ADR-013 |
+| FR-22 | Paystack webhooks (`charge.success`, subscription events) sync to the **same** internal subscription state as Stripe | G2 | ADR-013 |
+| FR-23 | A subscription records its **owning provider** + provider-side customer/subscription IDs | G2 | ADR-013 |
+
+**Non-Functional (extends §2.2 / §9A.2):**
+
+| ID | Requirement | Source | ADR |
+|---|---|---|---|
+| NFR-17 | **Security:** Paystack webhook verified via HMAC-SHA512 over the raw request body using the secret key, compared to `x-paystack-signature` (constant-time) | ADR-013 | ADR-013 |
+| NFR-18 | **Security/Reliability:** Both webhook handlers are idempotent and replay-resistant (provider event id deduplication) | §7, ADR-013 | ADR-013 |
+| NFR-19 | **Maintainability:** Adding/removing a provider, or setting the NGN price, is localised to `api/billing/*` + `lib/pricing` (extends QA-M1) | ADR-013 | ADR-013 |
+| NFR-20 | **Security:** No card data stored on either provider — hosted checkout both sides (PCI scope unchanged from ADR-003) | ADR-013 | ADR-013 |
+
+#### 9A.12.3 Added Quality-Attribute Scenarios
+
+| ID | Scenario (source→stimulus→environment→response→measure) | Measure |
+|---|---|---|
+| QA-BL1 | An authenticated user on the checkout step picks **Paystack**; the system initialises a Paystack transaction tied to the Paystack **Plan** for that tier | Hosted checkout / inline popup opens with the configured NGN amount; no card field on Forge |
+| QA-BL2 | An attacker POSTs a forged event to `/api/webhooks/paystack` | Rejected: `x-paystack-signature` HMAC-SHA512 mismatch → 401/400; no state change |
+| QA-BL3 | Paystack redelivers a `charge.success` event already processed | Handler is idempotent: subscription state unchanged; event id deduped |
+| QA-BL4 | Product owner has not yet set the NGN price for Team | `/pricing` shows USD; NGN shown as "coming soon" (no fabricated number); Paystack Team checkout disabled until configured |
+| QA-BL5 | A change of provider implementation (e.g. Paystack endpoint) is required | Change confined to `api/billing/paystack_provider.py`; subscriptions router, webhook dispatch, and tier logic untouched (NFR-19) |
+
+#### 9A.12.4 Logical View — Billing Delta
+
+New/changed components only (baseline §4.1; the `llm.py` provider seam is the
+precedent pattern for this billing seam):
+
+```mermaid
+graph TB
+    subgraph Browser
+        PRICING2["/pricing (static, ADR-012)<br/>shows USD + NGN per tier"]
+        CHECKOUT["Checkout step<br/>provider choice: Stripe / Paystack"]
+        PSPOP["Paystack inline popup (optional)<br/>frontend Paystack JS"]
+    end
+
+    subgraph NextJS["Next.js (:3000)"]
+        SUB_PROXY2["/api/subscriptions/checkout (proxy)"]
+        WH_PROXY["/api/webhooks/* (proxy, prod)"]
+    end
+
+    subgraph FastAPI["FastAPI (:8000)"]
+        SUB_API3["/api/subscriptions/checkout<br/>{tier, provider}"]
+        REG["BillingRegistry<br/>provider -> impl"]
+        IFACE["BillingProvider (interface)<br/>create_checkout_session / verify_webhook / handle_event"]
+        STRIPE_IMPL["StripeProvider<br/>stripe SDK"]
+        PS_IMPL["PaystackProvider<br/>REST over existing HTTP stack"]
+        WH_STRIPE["/api/webhooks/stripe"]
+        WH_PS["/api/webhooks/paystack<br/>HMAC-SHA512 verify"]
+        SUBSVC["Subscription state writer<br/>one internal shape"]
+    end
+
+    subgraph External["External"]
+        STRIPE2["Stripe API + Webhooks (USD)"]
+        PAYSTACK["Paystack API + Webhooks (NGN)<br/>Transactions + Plans"]
+    end
+
+    subgraph Data["Data"]
+        DB2[("subscriptions: provider discriminator<br/>+ provider-specific external IDs")]
+    end
+
+    PRICING2 --> CHECKOUT
+    CHECKOUT -->|POST {tier, provider}| SUB_PROXY2 --> SUB_API3
+    CHECKOUT -.optional access_code.-> PSPOP
+    SUB_API3 --> REG --> IFACE
+    IFACE --> STRIPE_IMPL --> STRIPE2
+    IFACE --> PS_IMPL --> PAYSTACK
+    STRIPE2 -->|webhook| WH_STRIPE
+    PAYSTACK -->|webhook| WH_PS
+    WH_STRIPE --> IFACE
+    WH_PS --> IFACE
+    IFACE --> SUBSVC --> DB2
+```
+
+**Added/changed component responsibilities:**
+
+| Component | Responsibility | Technology / Notes |
+|---|---|---|
+| **`BillingProvider` interface** | `create_checkout_session(user, tier, currency)`, `verify_webhook(raw_body, headers)`, `handle_event(event)` → `SubscriptionDelta`. The only place the rest of the app touches billing. | `api/billing/base.py` (Protocol/ABC) |
+| **`BillingRegistry`** | Map `"stripe"`/`"paystack"` → concrete provider; validate the requested provider against the enabled set. | `api/billing/registry.py` |
+| **`StripeProvider`** | Stripe Checkout session create; webhook verify via `stripe` lib; event map (`checkout.session.completed`, `customer.subscription.*`). | `stripe` (already planned, §8.2) |
+| **`PaystackProvider`** | Transaction init + Paystack **Plan** subscription; webhook verify (HMAC-SHA512 over raw body); event map (`charge.success`, `subscription.create`, `subscription.disable`, `invoice.*`). **REST over the existing HTTP stack — no required SDK.** | `requirements.txt` (HTTP client — to be added/verify on install) |
+| **`/api/webhooks/paystack` (new)** | Second webhook boundary; raw-body signature verify; idempotent dispatch to the shared subscription writer. | `api/routers/webhooks.py` |
+| **Subscription state writer** | One internal representation (`active`/`past_due`/`canceled`, tier, period end); both providers map onto it. | `api/routers/subscriptions.py` |
+| **Checkout step (FE)** | Provider-choice UI; sends `{tier, provider}`; for Paystack-inline, opens the popup with the server-returned `access_code`. **No billing logic, no secret keys** (ADR-012). | `pages/pricing.tsx` flow / `components/*` (UX owns layout) |
+
+#### 9A.12.5 Process View — Paystack Checkout & Webhook Delta
+
+Stripe checkout is §4.2.4. Paystack path (provider chosen = Paystack):
+
+```mermaid
+sequenceDiagram
+    actor U as Authenticated User
+    participant CO as Checkout step (FE)
+    participant PROXY as Next.js Proxy
+    participant SUB as FastAPI /api/subscriptions/checkout
+    participant REG as BillingRegistry
+    participant PS as PaystackProvider (REST)
+    participant PAYSTACK as Paystack API
+    participant WH as FastAPI /api/webhooks/paystack
+    participant DB as Database
+
+    U->>CO: Pick "Paystack (NGN)" for Pro
+    CO->>PROXY: POST /api/subscriptions/checkout {tier: pro, provider: paystack}
+    PROXY->>SUB: Proxy (authed)
+    SUB->>REG: get("paystack")
+    REG-->>SUB: PaystackProvider
+    SUB->>SUB: Resolve NGN amount + Plan id from pricing config (server-side)
+    SUB->>PS: create_checkout_session(user, pro, NGN)
+    PS->>PAYSTACK: initialize transaction (amount in kobo, plan, email, metadata{user_id, tier})
+    PAYSTACK-->>PS: {authorization_url, access_code, reference}
+    PS-->>SUB: CheckoutResult{url | access_code, provider_session_ref}
+    SUB-->>PROXY: 200 {checkout_url | access_code}
+    PROXY-->>CO: 200
+    alt Redirect mode
+        CO-->>U: Redirect to Paystack hosted checkout (NGN)
+    else Inline popup mode
+        CO->>CO: Open Paystack popup with access_code
+    end
+
+    U->>PAYSTACK: Complete payment
+    PAYSTACK->>WH: POST /api/webhooks/paystack (charge.success / subscription.create)
+    WH->>WH: Read RAW body; compute HMAC-SHA512(secret_key, raw_body)
+    WH->>WH: constant-time compare to x-paystack-signature
+    alt signature invalid
+        WH-->>PAYSTACK: 400/401 (no state change)
+    else valid
+        WH->>WH: dedupe by provider event id (replay protection)
+        WH->>REG: get("paystack").handle_event(event)
+        REG-->>WH: SubscriptionDelta{tier: pro, status: active, provider: paystack, ext IDs}
+        WH->>DB: UPSERT subscription (idempotent)
+        WH-->>PAYSTACK: 200 OK
+    end
+```
+
+#### 9A.12.6 Data Architecture — Billing Delta
+
+No new entities; the existing `SUBSCRIPTION` (§5.1) gains a **provider
+discriminator** and **provider-specific external IDs**, replacing the
+Stripe-only columns. No card data is stored (hosted checkout both sides).
+
+| Field (subscription) | Change | Notes |
+|---|---|---|
+| `provider` | **New.** `enum("stripe","paystack")` | Discriminator; which provider owns this subscription |
+| `currency` | **New.** `enum("USD","NGN")` (or ISO-4217 string) | USD↔Stripe, NGN↔Paystack |
+| `external_customer_id` | **Generalised** from `stripe_customer_id` | Stripe customer id OR Paystack customer code |
+| `external_subscription_id` | **Generalised** from `stripe_subscription_id` (UK) | Stripe subscription id OR Paystack subscription code |
+| `external_price_id` | **Generalised** from `stripe_price_id` | Stripe price id OR Paystack plan code |
+
+The `User.stripe_customer_id` (§5.2) generalises to a per-provider customer
+reference (e.g. `User.billing_refs` JSON or a `customer_refs` child table keyed by
+provider) so a user can be a customer on either provider without column churn.
+**No FX rate, no derived NGN amount is persisted.** Amounts are read from
+`lib/pricing` config at checkout-init time. Migration is additive + a backfill of
+`provider='stripe'` for existing rows (Alembic, per ADR-002).
+
+**Data flows (extends §5.4):**
+
+| Flow | Data | Classification | Encryption |
+|---|---|---|---|
+| FastAPI ↔ Paystack | Customer email, NGN amount, plan/transaction refs | PII / Financial | TLS 1.2+; Paystack handles PCI; no card data on Forge |
+| Paystack → FastAPI (webhook) | Charge/subscription status, refs, event id | Financial | TLS 1.2+; HMAC-SHA512 signature verified over raw body |
+
+**Pricing config shape (`lib/pricing.ts`, single source of truth — ADR-012/013):**
+
+```
+TIERS = {
+  pro:  { stripe: { currency: "USD", amount: 1900,  priceId: "<stripe price id>" },
+          paystack: { currency: "NGN", amount: "TO CONFIRM (product owner) — do not hardcode an FX-derived number",
+                      planCode: "<paystack plan code — TO CONFIRM>" } },
+  team: { stripe: { currency: "USD", amount: 4900,  priceId: "<stripe price id>" },
+          paystack: { currency: "NGN", amount: "TO CONFIRM (product owner) — do not hardcode an FX-derived number",
+                      planCode: "<paystack plan code — TO CONFIRM>" } },
+}
+```
+
+(USD amounts shown in minor units per Stripe convention; Paystack NGN is charged
+in kobo — the exact minor-unit representation is set when the product owner
+confirms the figure. No number is invented here.)
+
+#### 9A.12.7 Threat Model (STRIDE) — Paystack Boundary (new)
+
+Stripe ↔ FastAPI is §7.2 (unchanged). Paystack adds a **parallel** trust
+boundary. Differences from Stripe are called out.
+
+**Boundary: Paystack → `/api/webhooks/paystack` (FastAPI)**
+
+| Asset / Flow | Threat Category | Threat Description | Impact | Mitigation |
+|---|---|---|---|---|
+| Webhook POST | Spoofing | Attacker sends a fake Paystack event to grant a paid tier | Critical | **HMAC-SHA512** of the **raw** request body using the Paystack **secret key**, constant-time compared to `x-paystack-signature`; reject on mismatch (NFR-17). (Stripe uses `Stripe-Signature` HMAC-SHA256 via the `stripe` lib — different scheme, same intent.) |
+| Webhook POST | Tampering | MITM alters payload after signing | Critical | TLS 1.2+ **and** raw-body HMAC — body cannot be modified without invalidating the signature. Verify **before** JSON parsing/deserialisation. |
+| Webhook POST | Repudiation / replay | Paystack redelivers, or an attacker replays a captured valid event | Medium | Idempotent UPSERT keyed on provider event id / transaction reference; dedupe table or `WHERE status != target`; safe to receive twice (NFR-18). |
+| Webhook event | Elevation of Privilege | `charge.success` mapped to the wrong user/tier → free user gets Pro | High | Trust **server-side metadata** (`user_id`, `tier`) set at transaction-init, not client input; re-verify the transaction with Paystack (verify endpoint) before activating; map tier from `planCode`→config, not from the payload amount. |
+| Amount / currency | Tampering | Forged event claims a paid amount to unlock a tier | High | Activation gated on provider-verified transaction + expected NGN amount/plan from `lib/pricing`; amount in the event is not the source of truth for entitlement. |
+| Secret key | Information Disclosure | Paystack secret key leaked (also signs webhooks) | Critical | Secret from env var only; never in source/logs/client; rotate on breach; FE never receives the secret (inline popup uses the **public** key only). |
+| `/api/webhooks/paystack` | Denial of Service | Attacker floods the webhook endpoint | Medium | Cheap signature reject before parsing; rate-limit/size-cap the endpoint; verification is constant-time but bounded. |
+
+**Boundary: Browser → Paystack inline popup (if used)**
+
+| Asset / Flow | Threat Category | Threat Description | Impact | Mitigation |
+|---|---|---|---|---|
+| Paystack JS / public key | Information Disclosure | Public key exposed in client | Low | Public key is **designed** to be public; the secret key is never shipped to the client. |
+| `access_code` / amount | Tampering | Client tampers amount before popup | High | Transaction is **initialised server-side** with the config amount; popup uses the server `access_code`; client cannot set the price. |
+| Paystack JS | Tampering (supply chain) | Compromised Paystack inline script | Medium | Load from Paystack's official origin; SRI where supported; CSP `script-src` allowlist; prefer redirect mode if SRI is unavailable. |
+
+**Updated note for §7.1 trust boundaries:** boundary **#5 "FastAPI ↔ Stripe"**
+becomes **"FastAPI ↔ Billing Providers (Stripe and Paystack)"** — two external
+APIs and **two** webhook ingress points, each with its own signature scheme.
+
+#### 9A.12.8 Tech Stack — Billing Delta
+
+| Layer | Technology | Version | Requirement | Verification |
+|---|---|---|---|---|
+| Stripe | `stripe` (Python) | — | FR-11′, FR-22 (Stripe path) | Already planned in §8.2 — **to be added — verify on install** |
+| Paystack | **REST over existing HTTP stack** (no required SDK) | n/a | FR-21, FR-22 (Paystack path) | Paystack calls use plain HTTPS; **no SDK name/version invented** |
+| HTTP client (backend, if a dedicated one is wanted for Paystack REST) | e.g. `httpx` or `requests` | — | FR-21 | **To be added — verify on install** (only if the team prefers it over `urllib`; do not assume it is already present) |
+| Webhook signature (Paystack) | Python stdlib `hmac` + `hashlib` (SHA-512) | stdlib | NFR-17 | **Verified** — standard library, no new dependency |
+| Paystack inline (frontend, optional) | Paystack inline JS | — | FR-21 (inline mode) | **To be added — verify on install**; only if inline popup is chosen over redirect; loaded from Paystack origin |
+
+No change to the auth/persistence/tier stack. The `BillingProvider` seam adds
+**no** runtime dependency itself (pure Python interface); the only genuinely new
+external dependency is the Paystack integration, which can be satisfied with the
+stdlib + an HTTP client (verify on install).
+
+#### 9A.12.9 Trade-off Analysis (ATAM) — Billing Delta
+
+**Sensitivity points (extends §9.1 / §9A.10):**
+
+| ID | Sensitivity Point | Quality Attribute | Rationale |
+|---|---|---|---|
+| SP-9 | `BillingProvider` seam boundary | Maintainability, Security | Where the abstraction line sits decides whether provider quirks (signatures, plan vs price, kobo vs cents) leak into the rest of the app |
+| SP-10 | Paystack webhook signature + idempotency | Security, Reliability | Wrong hash algo (must be SHA-512, raw body) or non-idempotent handler = forged/duplicate entitlements |
+| SP-11 | `provider`/`currency` discriminator on subscription | Maintainability, Reliability | A missing discriminator makes dispatch (cancel/manage/reconcile) ambiguous |
+
+**Trade-off points (extends §9.2 / §9A.10):**
+
+| ID | Decision | Improved | Worsened | Rationale |
+|---|---|---|---|---|
+| TP-11 | **Dual provider (Stripe + Paystack)** | Market coverage (USD + NGN buyers) | Complexity: two SDKs/REST surfaces, two webhook boundaries, two reconciliations | Justified by G2 market expansion; complexity contained by the seam (SP-9) and one internal state |
+| TP-12 | **User picks provider (Option B)** vs auto-detect | User agency, testability, fewer mis-detections | One extra checkout step | G2-locked; avoids geo/VPN mis-routing and keeps the flow explicit/testable |
+| TP-13 | **Paystack via REST (no SDK)** | No invented/unmaintained dep; full control | More hand-written HTTP + signature code to test | Matches the `llm.py` "thin client" precedent; stdlib `hmac`/`hashlib` covers signing |
+| TP-14 | **NGN as confirmed config, not FX** | Correctness, no silent mispricing | Paystack checkout blocked until product owner sets values | Deliberate: a wrong auto-FX price is worse than a delayed NGN launch |
+
+**Risks (extends §9.3 / §9A.10):**
+
+| ID | Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|---|
+| R-13 | **NGN prices never confirmed → Paystack checkout cannot ship** | Medium | High | Track as a product-owner blocker; gate Paystack CTA on configured NGN value; ship Stripe-USD independently |
+| R-14 | **Paystack webhook verification misconfigured** (wrong algo/parsed-body) | Medium | Critical | Verify HMAC-SHA512 over the **raw** body before parsing; test with Paystack test events; log verification outcome in dev |
+| R-15 | **Non-idempotent handler → duplicate/skewed subscriptions on redelivery** | Medium | High | Idempotent UPSERT keyed on provider event id; re-verify transaction; integration test redelivery |
+| R-16 | **Two providers drift in entitlement mapping** (Stripe active ≠ Paystack active) | Medium | Medium | Single `SubscriptionDelta` shape + shared writer; contract tests per provider against the same internal state |
+| R-17 | **Entitlement granted on forged amount/event** | Low | Critical | Activate only on provider-verified transaction + expected config amount; metadata (not payload amount) drives tier (STRIDE §9A.12.7) |
+
+**Non-risks (extends §9.4 / §9A.10):**
+
+| ID | Non-Risk | Rationale |
+|---|---|---|
+| NR-8 | **PCI scope increases** | Both providers are hosted checkout; no card data on Forge (NFR-20), same as ADR-003 |
+| NR-9 | **Tier/UI logic must branch per provider** | Internal subscription state is one shape; tiers (ADR-005), status endpoint, and UI are provider-neutral |
+| NR-10 | **In-place provider switching needed for v1** | One subscription = one provider; switching = cancel-then-create; in-place migration is out of scope |
+
+### 9A.11 Deliberately Out of Scope (this extension)
+
+| Item | Rationale |
+|---|---|
+| Per-sharer referral attribution (unique tokens) | Privacy + over-engineering; `ref=export` channel tag suffices (ADR-011) |
+| Pricing CMS / runtime price editing | `lib/pricing.ts` config is sufficient at this scale (ADR-012) |
+| react-three-fiber | Not requested; adds React-coupled dependency; raw three.js in one component is enough (ADR-010) |
+| Demo fixture replacement | Locked unchanged at G1 #4; only the landing preview copy is touched |
+| Landing layout / motion choreography / social-proof visual design | UX-designer territory (`docs/DESIGN-SPEC.md`), not architecture |
+| Server-side anonymous plan store | One-plan handoff via the existing sessionStorage is simpler (ADR-009 alt rejected) |
+| In-place provider switching (move a live subscription Stripe↔Paystack) | v1: one subscription = one provider; switch = cancel-then-create (ADR-013) |
+| FX conversion / live NGN pricing | NGN is product-owner-confirmed config, never FX-derived (ADR-013); no rate engine |
+| Auto-detecting provider by geo/IP | G2 locked Option B (user picks); avoids mis-routing (ADR-013) |
+| Third+ payment providers, wallets, crypto | Only Stripe (USD) + Paystack (NGN) at G2; seam allows later addition (ADR-013) |
+| Multi-currency on a single provider (e.g. Stripe NGN) | Not an assumed capability; NGN is the Paystack path (ADR-013) |
+
+---
+
 ## 10. Migration Plan
 
 ### 10.1 Phase 1: Foundation (Week 1)
@@ -1171,12 +1777,17 @@ Every significant architecture decision is recorded in `docs/adr/`:
 |---|---|---|
 | [ADR-001](adr/ADR-001-jwt-httponly-cookie.md) | JWT in httpOnly Cookie Session | Proposed |
 | [ADR-002](adr/ADR-002-sqlite-postgresql-sqlalchemy.md) | SQLite Dev / PostgreSQL Prod with SQLAlchemy + Alembic | Proposed |
-| [ADR-003](adr/ADR-003-stripe-checkout-hosted.md) | Stripe Checkout Hosted Flow | Proposed |
+| [ADR-003](adr/ADR-003-stripe-checkout-hosted.md) | Stripe Checkout Hosted Flow | **Superseded by ADR-013** |
 | [ADR-004](adr/ADR-004-fastapi-owns-auth.md) | FastAPI Owns Auth and Business Logic | Proposed |
 | [ADR-005](adr/ADR-005-soft-prompt-hard-cap.md) | Soft UI Prompt + Hard API Cap for Tier Enforcement | Proposed |
 | [ADR-006](adr/ADR-006-watermark-footer.md) | Watermark as Document Footer | Proposed |
 | [ADR-007](adr/ADR-007-e2e-auth-bypass.md) | Dev-Only e2e Auth Bypass | Proposed |
-| [ADR-008](adr/ADR-008-no-session-migration.md) | No Migration of Anonymous Session Plans on Signup | Proposed |
+| [ADR-008](adr/ADR-008-no-session-migration.md) | No Migration of Anonymous Session Plans on Signup | **Superseded by ADR-009** |
+| [ADR-009](adr/ADR-009-auto-save-on-signup.md) | Auto-Save Session Plan on Signup | Accepted |
+| [ADR-010](adr/ADR-010-threejs-gsap-landing.md) | three.js + GSAP for the Buyer-Facing Landing Hero | Accepted |
+| [ADR-011](adr/ADR-011-watermark-referral-attribution.md) | Watermark Referral Attribution (`ref=export`) | Accepted |
+| [ADR-012](adr/ADR-012-pricing-route.md) | Dedicated `/pricing` Route | Accepted (amended for ADR-013) |
+| [ADR-013](adr/ADR-013-multi-provider-billing.md) | Multi-Provider Billing (Stripe + Paystack, user-selected) | Accepted (supersedes ADR-003) |
 
 ---
 
