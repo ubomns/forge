@@ -40,6 +40,9 @@ from api.schema import (
 )
 from api.export import register_export_routes
 from api.export_pdf import register_pdf_routes
+from api.database import init_db
+from api.routers import auth as auth_router
+from api.routers import leads as leads_router
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["10/minute"])
 app = FastAPI()
@@ -49,11 +52,24 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 register_export_routes(app, limiter)
 register_pdf_routes(app, limiter)
 
+# Auth + lead-capture routers (Sprint 0 foundation)
+app.include_router(auth_router.router)
+leads_router.init_leads_limiter(limiter)
+app.include_router(leads_router.router)
+
+
+@app.on_event("startup")
+def _startup_init_db() -> None:
+    """Create tables for dev/SQLite. Production uses Alembic migrations (ADR-002)."""
+    init_db()
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:3001"],
-    allow_origin_regex=r"https://.*\.vercel\.app",
-    allow_methods=["POST", "OPTIONS"],
+    # allow_origin_regex removed — use explicit origin whitelist only (security audit)
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 

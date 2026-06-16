@@ -4,10 +4,9 @@ test.describe('Landing page (/)', () => {
     test('renders hero, problem, how-it-works, decisions, and CTAs', async ({ page }) => {
         await page.goto('/');
 
-        // Hero
-        await expect(page.locator('.landing-h1')).toContainText('First drafts that are');
-        await expect(page.locator('.landing-h1-accent')).toBeVisible();
-        await expect(page.locator('.landing-sub')).toContainText('typed');
+        // Hero (buyer-facing rewrite — static headline; rotating word removed per ADR-010/DESIGN-SPEC E1)
+        await expect(page.locator('.landing-h1')).toContainText('taken seriously');
+        await expect(page.locator('.landing-sub')).toContainText('investor-ready');
 
         // CTAs
         const generateCta = page.getByTestId('landing-cta-generate');
@@ -23,10 +22,8 @@ test.describe('Landing page (/)', () => {
         await expect(howCards).toHaveCount(3);
         await expect(howCards.first()).toContainText('Schema-first');
 
-        // Locked decisions — at least 6 cards
-        const decisionCards = page.locator('.landing-decision-card');
-        const count = await decisionCards.count();
-        expect(count).toBeGreaterThanOrEqual(6);
+        // Buyer-facing differentiation — 4 cards (replaces builder-facing "locked decisions")
+        await expect(page.locator('.buyer-diff-card')).toHaveCount(4);
 
         // Footer CTA mirrors hero
         await expect(page.locator('.landing-footer-h2')).toContainText('Ready to forge yours?');
@@ -47,15 +44,4 @@ test.describe('Landing page (/)', () => {
         await expect(page.locator('.hero-title')).toBeVisible();
     });
 
-    test('rotating hero word changes over time', async ({ page }) => {
-        await page.goto('/');
-        const initial = await page.locator('.landing-h1-accent').first().textContent();
-        // The word rotates every 2200ms. Poll for up to 6s for any different word.
-        await expect
-            .poll(async () => await page.locator('.landing-h1-accent').first().textContent(), {
-                timeout: 6_000,
-                intervals: [200, 400, 600],
-            })
-            .not.toBe(initial);
-    });
 });
