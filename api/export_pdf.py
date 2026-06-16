@@ -8,10 +8,16 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
 
+from api.auth import get_optional_user
 from api.schema import BusinessPlan, SECTION_DISPLAY_NAMES, SECTION_ORDER
+from api.watermark import watermark_text
 
 
 class _PlanPDF(FPDF):
+    def __init__(self, tier: str = "anonymous"):
+        super().__init__()
+        self._tier = tier
+
     def header(self):
         if self.page_no() == 1:
             return
@@ -26,9 +32,17 @@ class _PlanPDF(FPDF):
         self.set_text_color(160, 154, 148)
         self.cell(0, 10, f"Page {self.page_no()}/{{nb}}", align="C")
 
+        # Watermark for anonymous/free tiers (ADR-011)
+        watermark = watermark_text(self._tier)
+        if watermark:
+            self.set_y(-25)
+            self.set_font("Helvetica", "I", 7)
+            self.set_text_color(180, 174, 168)
+            self.cell(0, 10, watermark, align="C")
 
-def _build_pdf(plan: BusinessPlan) -> bytes:
-    pdf = _PlanPDF()
+
+def _build_pdf(plan: BusinessPlan, tier: str = "anonymous") -> bytes:
+    pdf = _PlanPDF(tier)
     pdf.alias_nb_pages()
     pdf.set_auto_page_break(auto=True, margin=25)
     pdf.add_page()
@@ -132,6 +146,15 @@ def register_pdf_routes(app: FastAPI, limiter: Limiter) -> None:
     @app.post("/api/export-pdf")
     @limiter.limit("10/minute")
     async def export_pdf(request: Request, body: dict[str, Any]):
+        # Determine tier from auth cookie (anonymous if not authenticated)
+        from api.models import User
+        user: User | None = None
+        try:
+            user = await get_optional_user(request)
+        except Exception:
+            pass
+        tier = user.tier if user else "anonymous"
+
         try:
             plan = BusinessPlan.model_validate(body)
         except Exception as exc:
@@ -141,7 +164,7 @@ def register_pdf_routes(app: FastAPI, limiter: Limiter) -> None:
             )
 
         try:
-            pdf_bytes = _build_pdf(plan)
+            pdf_bytes = _build_pdf(plan, tier)
         except Exception as exc:
             raise HTTPException(
                 status_code=500,
