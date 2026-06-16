@@ -1,6 +1,6 @@
 # MEMORY.md — Forge Project Continuity (for an LLM)
 
-**Last updated:** 2026-06-15 (verification gate completed)
+**Last updated:** 2026-06-15 (Sprint 2 COMPLETE)
 **Purpose:** Hand a future LLM/agent everything needed to resume work without re-deriving context.
 **Read this first, then `git log --oneline -8` and the files cited below.**
 
@@ -12,9 +12,19 @@ The team is mid-way through building the **Conversion Playbook + Multi-Provider 
 
 - **Planning is 100% done** (gates G1–G4: PRD, architecture, ADRs, WBS, design spec).
 - **Build is partial:** Sprint 0 (backend foundation) and Sprint 1 (landing stale-copy) are **committed and verified**.
-- **Gate G5 approved by user.** Security audit completed; 5 of 6 blocking findings fixed directly by Engineering Lead and committed (see §9). qa-tester and code-reviewer **Task tool calls fail repeatedly** — Engineering Lead must run verification directly or user must approve merge without specialist evidence.
-- **Resume at:** Verification gate completed by Engineering Lead — e2e suite passes (20 passed, 3 skipped). A stray `nul` file (Windows reserved device name) was removed; it was blocking Next.js dev server / Turbopack. Pending user approval to merge `chore/claude-dev-team` → `dev`, then **Alembic migrations** (ADR-002 leftover), then **Sprint 2**.
-- **Active branch:** `chore/claude-dev-team` (NOT pushed; off `dev`). Security fixes committed as `fc8ba24`; model pins in `.opencode/agents/*.md` bumped to `kimi-k2.7` (uncommitted).
+- **Gate G5 approved by user.** Security audit completed; 5 of 6 blocking findings fixed directly by Engineering Lead and committed (see §9).
+- **Merge completed:** `chore/claude-dev-team` → `dev` pushed to origin (commit `818d17b`). Sprint 0 + Sprint 1 now on `dev`.
+- **Sprint 2 COMPLETE** on `feat/sprint-2-auth` (all work packages delivered):
+  - Option B: Refresh token architecture (15-min access + 7-day refresh, rotated on use, revoked on logout)
+  - Plan CRUD: `GET/POST/GET/DELETE /api/plans` with free-tier cap (3 plans, 403 PLAN_LIMIT_REACHED)
+  - Auth UI: Login/signup modal with Google OAuth button, email-capture modal, auth-aware Nav, Save Plan button, My Plans page
+  - Password reset: `POST /api/auth/password-reset` + `/password-reset-confirm` (24h token, single-use)
+  - Google OAuth: `GET /api/auth/google/callback` — creates/links user, sets cookies
+  - Tiered exports: Watermark wired into `api/export.py` + `api/export_pdf.py` (anon/free get watermark, pro/team don't)
+  - Free prompt banner: Appears after plan done for anonymous users, 24h dismiss via localStorage
+  - Load from URL: `/app?plan_id=xxx` fetches plan and hydrates into done state
+- **Resume at:** Push `feat/sprint-2-auth` → origin, PR to `dev`, then **Sprint 3** — Stripe billing + `/pricing` page + demo update.
+- **Active branch:** `feat/sprint-2-auth` (off `dev`). Ready to push and PR.
 
 To operate: start a Claude Code session in this repo (it auto-loads the **Engineering Lead** output style), set `/model claude-opus-4-8`, then say e.g. *"continue the verification gate"* or *"start Sprint 2."*
 
@@ -164,7 +174,7 @@ All recommendations are **fully designed**; build status:
 
 ## 9. Known issues / small follow-ups
 
-### Security audit findings (2026-06-15) — 5 fixed, 1 pending user decision
+### Security audit findings (2026-06-15) — all 6 resolved
 
 **Fixed by Engineering Lead directly:**
 - ✅ `.env` with live OpenAI API key — removed from working tree (already gitignored, not tracked). **User must rotate the key in OpenAI dashboard.**
@@ -172,9 +182,13 @@ All recommendations are **fully designed**; build status:
 - ✅ `next@16.2.4` — upgraded to `^16.2.9` (multiple High CVEs).
 - ✅ CORS `allow_origin_regex=r"https://.*\.vercel\.app"` with `allow_credentials=True` — removed regex, now explicit origin whitelist only.
 - ✅ Signup `EMAIL_EXISTS` 409 — changed to generic 200 response to prevent user enumeration.
-
-**Pending user decision:**
-- 🟡 **Logout does not invalidate JWT server-side** (High). Current behavior: logout clears cookie, but JWT remains valid for 7 days. Fix options: (1) token deny-list in DB (simplest), (2) short-lived access + refresh tokens, or (3) accept risk and document. **User deferred decision — implement in Sprint 2 or address now?**
+- ✅ **Logout JWT invalidation** (High) — resolved via Option B (Refresh Token Architecture):
+  - Access tokens: 15-minute expiry — expire naturally quickly
+  - Refresh tokens: stored in DB, revoked on logout, rotated on use
+  - True server-side logout: `POST /api/auth/logout` revokes refresh token in DB
+  - `api/auth.py`: `create_access_token`, `create_refresh_token`, `verify_refresh_token`, `revoke_refresh_token`, `rotate_refresh_token`
+  - `api/models.py`: `RefreshToken` table with `token_hash`, `expires_at`, `revoked_at`
+  - `lib/auth.tsx`: Frontend auth state management with automatic refresh on 401
 
 ### Pre-existing follow-ups
 - `watermark.py` helper is **not wired** into `api/export.py` / `api/export_pdf.py`.
@@ -199,7 +213,7 @@ npm run lint
 python -m venv .venv
 .venv/Scripts/python.exe -m pip install -r requirements.txt
 # required env: OPENAI_API_KEY, JWT_SECRET (see .env.example)
-.venv/Scripts/python.exe -c "import api.index; print(len(api.index.app.routes))"  # 16
+.venv/Scripts/python.exe -c "import api.index; print(len(api.index.app.routes))"  # 17 (includes /api/auth/refresh)
 
 # Both processes
 npm run dev:all          # FastAPI :8000 + Next :3000

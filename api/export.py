@@ -10,7 +10,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
 
+from api.auth import get_optional_user
 from api.schema import BusinessPlan, SECTION_DISPLAY_NAMES, SECTION_ORDER
+from api.watermark import watermark_text
 
 
 def _add_heading(doc: Document, text: str, level: int = 2) -> None:
@@ -29,7 +31,7 @@ def _add_bullet_list(doc: Document, items: list[str]) -> None:
         doc.add_paragraph(item, style="List Bullet")
 
 
-def _build_docx(plan: BusinessPlan) -> bytes:
+def _build_docx(plan: BusinessPlan, tier: str = "anonymous") -> bytes:
     doc = Document()
 
     style = doc.styles["Normal"]
@@ -105,6 +107,17 @@ def _build_docx(plan: BusinessPlan) -> bytes:
 
         doc.add_paragraph()
 
+    # Watermark footer for anonymous/free tiers (ADR-011)
+    watermark = watermark_text(tier)
+    if watermark:
+        doc.add_paragraph()
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run(watermark)
+        run.font.size = Pt(9)
+        run.font.color.rgb = RGBColor(0x96, 0x96, 0x96)
+        run.italic = True
+
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
@@ -115,6 +128,15 @@ def register_export_routes(app: FastAPI, limiter: Limiter) -> None:
     @app.post("/api/export")
     @limiter.limit("10/minute")
     async def export_docx(request: Request, body: dict[str, Any]):
+        # Determine tier from auth cookie (anonymous if not authenticated)
+        from api.models import User
+        user: User | None = None
+        try:
+            user = await get_optional_user(request)
+        except Exception:
+            pass
+        tier = user.tier if user else "anonymous"
+
         try:
             plan = BusinessPlan.model_validate(body)
         except Exception as exc:
@@ -124,7 +146,7 @@ def register_export_routes(app: FastAPI, limiter: Limiter) -> None:
             )
 
         try:
-            docx_bytes = _build_docx(plan)
+            docx_bytes = _build_docx(plan, tier)
         except Exception as exc:
             raise HTTPException(
                 status_code=500,
