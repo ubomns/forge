@@ -1,6 +1,6 @@
 # MEMORY.md — Forge Project Continuity (for an LLM)
 
-**Last updated:** 2026-06-15 (Option B implemented, Sprint 2 in progress)
+**Last updated:** 2026-06-15 (Sprint 2 core complete — auth UI + plan persistence)
 **Purpose:** Hand a future LLM/agent everything needed to resume work without re-deriving context.
 **Read this first, then `git log --oneline -8` and the files cited below.**
 
@@ -14,8 +14,11 @@ The team is mid-way through building the **Conversion Playbook + Multi-Provider 
 - **Build is partial:** Sprint 0 (backend foundation) and Sprint 1 (landing stale-copy) are **committed and verified**.
 - **Gate G5 approved by user.** Security audit completed; 5 of 6 blocking findings fixed directly by Engineering Lead and committed (see §9).
 - **Merge completed:** `chore/claude-dev-team` → `dev` pushed to origin (commit `818d17b`). Sprint 0 + Sprint 1 now on `dev`.
-- **Option B (Refresh Token Architecture) implemented and committed** on `feat/sprint-2-auth` (commit `0b322f5`). Access tokens: 15-min expiry. Refresh tokens: 7-day expiry, stored in DB, rotated on use, revoked on logout. Frontend `useAuth` hook + `AuthProvider` in `lib/auth.tsx`.
-- **Resume at:** **Sprint 2** — Auth UI (login/signup modals, Nav auth state, email-capture modal, "My plans" page, save plan button). Backend: Plan CRUD router, Google OAuth, password reset, tiered exports with watermark.
+- **Sprint 2 core implemented and committed** on `feat/sprint-2-auth` (commits: `0b322f5` Option B, `5efdb47` Plan CRUD, `a885fa5` Auth UI + My Plans).
+  - Option B: Refresh token architecture (15-min access + 7-day refresh, rotated on use, revoked on logout)
+  - Plan CRUD: `GET/POST/GET/DELETE /api/plans` with free-tier cap (3 plans, 403 PLAN_LIMIT_REACHED)
+  - Auth UI: Login/signup modal, email-capture modal, auth-aware Nav, Save Plan button, My Plans page
+- **Resume at:** Remaining Sprint 2 items: Google OAuth backend, password reset flow, tiered exports with watermark wiring, free-account prompt banner, load saved plan from URL param. Then Sprint 3: Stripe billing + /pricing page.
 - **Active branch:** `feat/sprint-2-auth` (off `dev`). Push to origin when Sprint 2 complete, then PR to `dev`.
 
 To operate: start a Claude Code session in this repo (it auto-loads the **Engineering Lead** output style), set `/model claude-opus-4-8`, then say e.g. *"continue the verification gate"* or *"start Sprint 2."*
