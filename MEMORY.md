@@ -1,6 +1,6 @@
 # MEMORY.md — Forge Project Continuity (for an LLM)
 
-**Last updated:** 2026-06-15 (Sprint 2 core complete — auth UI + plan persistence)
+**Last updated:** 2026-06-15 (Sprint 2 COMPLETE)
 **Purpose:** Hand a future LLM/agent everything needed to resume work without re-deriving context.
 **Read this first, then `git log --oneline -8` and the files cited below.**
 
@@ -14,12 +14,17 @@ The team is mid-way through building the **Conversion Playbook + Multi-Provider 
 - **Build is partial:** Sprint 0 (backend foundation) and Sprint 1 (landing stale-copy) are **committed and verified**.
 - **Gate G5 approved by user.** Security audit completed; 5 of 6 blocking findings fixed directly by Engineering Lead and committed (see §9).
 - **Merge completed:** `chore/claude-dev-team` → `dev` pushed to origin (commit `818d17b`). Sprint 0 + Sprint 1 now on `dev`.
-- **Sprint 2 core implemented and committed** on `feat/sprint-2-auth` (commits: `0b322f5` Option B, `5efdb47` Plan CRUD, `a885fa5` Auth UI + My Plans).
+- **Sprint 2 COMPLETE** on `feat/sprint-2-auth` (all work packages delivered):
   - Option B: Refresh token architecture (15-min access + 7-day refresh, rotated on use, revoked on logout)
   - Plan CRUD: `GET/POST/GET/DELETE /api/plans` with free-tier cap (3 plans, 403 PLAN_LIMIT_REACHED)
-  - Auth UI: Login/signup modal, email-capture modal, auth-aware Nav, Save Plan button, My Plans page
-- **Resume at:** Remaining Sprint 2 items: Google OAuth backend, password reset flow, tiered exports with watermark wiring, free-account prompt banner, load saved plan from URL param. Then Sprint 3: Stripe billing + /pricing page.
-- **Active branch:** `feat/sprint-2-auth` (off `dev`). Push to origin when Sprint 2 complete, then PR to `dev`.
+  - Auth UI: Login/signup modal with Google OAuth button, email-capture modal, auth-aware Nav, Save Plan button, My Plans page
+  - Password reset: `POST /api/auth/password-reset` + `/password-reset-confirm` (24h token, single-use)
+  - Google OAuth: `GET /api/auth/google/callback` — creates/links user, sets cookies
+  - Tiered exports: Watermark wired into `api/export.py` + `api/export_pdf.py` (anon/free get watermark, pro/team don't)
+  - Free prompt banner: Appears after plan done for anonymous users, 24h dismiss via localStorage
+  - Load from URL: `/app?plan_id=xxx` fetches plan and hydrates into done state
+- **Resume at:** Push `feat/sprint-2-auth` → origin, PR to `dev`, then **Sprint 3** — Stripe billing + `/pricing` page + demo update.
+- **Active branch:** `feat/sprint-2-auth` (off `dev`). Ready to push and PR.
 
 To operate: start a Claude Code session in this repo (it auto-loads the **Engineering Lead** output style), set `/model claude-opus-4-8`, then say e.g. *"continue the verification gate"* or *"start Sprint 2."*
 
