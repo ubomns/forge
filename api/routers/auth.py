@@ -396,3 +396,100 @@ async def password_reset_confirm(
 
     logger.info("Password reset completed (user_id=%s)", user.id)
     return {"message": "Password updated successfully"}
+
+
+# ---------------------------------------------------------------------------
+# Google OAuth
+# ---------------------------------------------------------------------------
+
+import os
+
+from authlib.integrations.starlette_client import OAuth
+from starlette.config import Config
+
+# OAuth config from env vars
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+
+oauth = OAuth()
+if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
+    oauth.register(
+        name="google",
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        client_kwargs={"scope": "openid email profile"},
+    )
+
+
+@router.get("/google/callback")
+async def google_callback(
+    request: Request,
+    code: str = "",
+    error: str = "",
+    db: Session = Depends(get_db),
+) -> JSONResponse:
+    """Google OAuth callback.
+
+    Exchanges code for access token, fetches user profile,
+    creates or logs in user, sets auth cookies.
+    """
+    if error:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "OAUTH_ERROR", "message": error}},
+        )
+
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": {"code": "CONFIG_ERROR", "message": "Google OAuth not configured"}},
+        )
+
+    try:
+        token = await oauth.google.authorize_access_token(request)
+    except Exception as exc:
+        logger.warning("Google OAuth token exchange failed: %s", exc)
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "OAUTH_ERROR", "message": "Failed to exchange authorization code"}},
+        )
+
+    user_info = token.get("userinfo")
+    if not user_info:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "OAUTH_ERROR", "message": "No user info in token"}},
+        )
+
+    email = user_info.get("email")
+    google_id = user_info.get("sub")
+    if not email or not google_id:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "OAUTH_ERROR", "message": "Incomplete user info"}},
+        )
+
+    # Find or create user
+    user = db.query(User).filter(User.google_id == google_id).first()
+    if not user:
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            # Link Google ID to existing email account
+            user.google_id = google_id
+        else:
+            # Create new user
+            user = User(
+                email=email,
+                google_id=google_id,
+                tier="free",
+            )
+            db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    response = JSONResponse(content=_user_response(user))
+    _set_auth_cookies(response, user, db)
+
+    logger.info("User logged in via Google OAuth (user_id=%s)", user.id)
+    return response
