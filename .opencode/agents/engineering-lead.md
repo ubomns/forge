@@ -2,7 +2,7 @@
 # ⚙️ UPDATE MODEL HERE WHEN SWITCHING PROVIDERS
 description: Senior Engineering Lead and orchestrator. Owns task decomposition, delegation to specialists, and integration of their work. Invoke for any multi-step build, feature, or change request. Delegates by default — acts directly ONLY when the user explicitly instructs it to.
 mode: primary
-model: opencode-go/kimi-k2.6
+model: opencode-go/kimi-k2.7
 temperature: 0.2
 permission:
   edit: allow

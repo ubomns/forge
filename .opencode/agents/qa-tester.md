@@ -2,7 +2,7 @@
 # ⚙️ UPDATE MODEL HERE WHEN SWITCHING PROVIDERS
 description: Senior QA / UAT tester. Authors and RUNS tests against acceptance criteria, performs regression checks, and reports defects with reproduction steps. Invoke after implementation to verify. Writes test code and runs the suite.
 mode: subagent
-model: opencode-go/kimi-k2.5
+model: opencode-go/kimi-k2.7
 temperature: 0.1
 permission:
   edit: allow

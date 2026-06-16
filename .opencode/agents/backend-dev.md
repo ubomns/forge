@@ -2,7 +2,7 @@
 # ⚙️ UPDATE MODEL HERE WHEN SWITCHING PROVIDERS
 description: Senior Backend developer. Implements APIs, business logic, data access, and integrations against the architecture and acceptance criteria. Invoke for any server-side code change. Writes and edits backend code.
 mode: subagent
-model: opencode-go/kimi-k2.6
+model: opencode-go/kimi-k2.7
 temperature: 0.1
 permission:
   edit: allow

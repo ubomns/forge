@@ -2,7 +2,7 @@
 # ⚙️ UPDATE MODEL HERE WHEN SWITCHING PROVIDERS
 description: Senior Application security engineer. Audits code and dependencies for vulnerabilities. Read-only — reports findings, never fixes. Invoke on EVERY PR as a default gate, and always for changes touching auth, data, input handling, secrets, or dependencies.
 mode: subagent
-model: opencode-go/kimi-k2.6
+model: opencode-go/kimi-k2.7
 temperature: 0.1
 permission:
   edit: deny

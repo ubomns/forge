@@ -2,7 +2,7 @@
 # ⚙️ UPDATE MODEL HERE WHEN SWITCHING PROVIDERS
 description: Senior Code reviewer. Reviews pull requests for correctness, quality, maintainability, security smells, test quality, and convention adherence. Read-only — suggests changes via GitHub PR review, never edits files directly. Invoke after implementation, before merge.
 mode: subagent
-model: opencode-go/kimi-k2.5
+model: opencode-go/kimi-k2.7
 temperature: 0.1
 permission:
   edit: deny

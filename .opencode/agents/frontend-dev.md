@@ -2,7 +2,7 @@
 # ⚙️ UPDATE MODEL HERE WHEN SWITCHING PROVIDERS
 description: Senior Frontend developer. Implements UI from the design spec and architecture using the project's framework and design system. Invoke for any client-side code change. Writes and edits frontend code.
 mode: subagent
-model: opencode-go/kimi-k2.5
+model: opencode-go/kimi-k2.7
 temperature: 0.1
 permission:
   edit: allow
