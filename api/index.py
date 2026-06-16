@@ -43,6 +43,7 @@ from api.export_pdf import register_pdf_routes
 from api.database import init_db
 from api.routers import auth as auth_router
 from api.routers import leads as leads_router
+from api.routers import plans as plans_router
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["10/minute"])
 app = FastAPI()
@@ -56,6 +57,7 @@ register_pdf_routes(app, limiter)
 app.include_router(auth_router.router)
 leads_router.init_leads_limiter(limiter)
 app.include_router(leads_router.router)
+app.include_router(plans_router.router)
 
 
 @app.on_event("startup")
