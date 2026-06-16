@@ -1,6 +1,6 @@
 # MEMORY.md — Forge Project Continuity (for an LLM)
 
-**Last updated:** 2026-06-15 (merge to dev completed, Sprint 2 starting)
+**Last updated:** 2026-06-15 (Option B implemented, Sprint 2 in progress)
 **Purpose:** Hand a future LLM/agent everything needed to resume work without re-deriving context.
 **Read this first, then `git log --oneline -8` and the files cited below.**
 
@@ -14,8 +14,9 @@ The team is mid-way through building the **Conversion Playbook + Multi-Provider 
 - **Build is partial:** Sprint 0 (backend foundation) and Sprint 1 (landing stale-copy) are **committed and verified**.
 - **Gate G5 approved by user.** Security audit completed; 5 of 6 blocking findings fixed directly by Engineering Lead and committed (see §9).
 - **Merge completed:** `chore/claude-dev-team` → `dev` pushed to origin (commit `818d17b`). Sprint 0 + Sprint 1 now on `dev`.
-- **Resume at:** **Sprint 2** — Auth UI + email capture + plan persistence. Alembic migrations (ADR-002) can run in parallel with Sprint 2 backend work.
-- **Active branch:** `dev` (merged). Create feature branches off `dev` for Sprint 2 work.
+- **Option B (Refresh Token Architecture) implemented and committed** on `feat/sprint-2-auth` (commit `0b322f5`). Access tokens: 15-min expiry. Refresh tokens: 7-day expiry, stored in DB, rotated on use, revoked on logout. Frontend `useAuth` hook + `AuthProvider` in `lib/auth.tsx`.
+- **Resume at:** **Sprint 2** — Auth UI (login/signup modals, Nav auth state, email-capture modal, "My plans" page, save plan button). Backend: Plan CRUD router, Google OAuth, password reset, tiered exports with watermark.
+- **Active branch:** `feat/sprint-2-auth` (off `dev`). Push to origin when Sprint 2 complete, then PR to `dev`.
 
 To operate: start a Claude Code session in this repo (it auto-loads the **Engineering Lead** output style), set `/model claude-opus-4-8`, then say e.g. *"continue the verification gate"* or *"start Sprint 2."*
 
@@ -165,7 +166,7 @@ All recommendations are **fully designed**; build status:
 
 ## 9. Known issues / small follow-ups
 
-### Security audit findings (2026-06-15) — 5 fixed, 1 pending user decision
+### Security audit findings (2026-06-15) — all 6 resolved
 
 **Fixed by Engineering Lead directly:**
 - ✅ `.env` with live OpenAI API key — removed from working tree (already gitignored, not tracked). **User must rotate the key in OpenAI dashboard.**
@@ -173,9 +174,13 @@ All recommendations are **fully designed**; build status:
 - ✅ `next@16.2.4` — upgraded to `^16.2.9` (multiple High CVEs).
 - ✅ CORS `allow_origin_regex=r"https://.*\.vercel\.app"` with `allow_credentials=True` — removed regex, now explicit origin whitelist only.
 - ✅ Signup `EMAIL_EXISTS` 409 — changed to generic 200 response to prevent user enumeration.
-
-**Pending user decision:**
-- 🟡 **Logout does not invalidate JWT server-side** (High). Current behavior: logout clears cookie, but JWT remains valid for 7 days. Fix options: (1) token deny-list in DB (simplest), (2) short-lived access + refresh tokens, or (3) accept risk and document. **User deferred decision — implement in Sprint 2 or address now?**
+- ✅ **Logout JWT invalidation** (High) — resolved via Option B (Refresh Token Architecture):
+  - Access tokens: 15-minute expiry — expire naturally quickly
+  - Refresh tokens: stored in DB, revoked on logout, rotated on use
+  - True server-side logout: `POST /api/auth/logout` revokes refresh token in DB
+  - `api/auth.py`: `create_access_token`, `create_refresh_token`, `verify_refresh_token`, `revoke_refresh_token`, `rotate_refresh_token`
+  - `api/models.py`: `RefreshToken` table with `token_hash`, `expires_at`, `revoked_at`
+  - `lib/auth.tsx`: Frontend auth state management with automatic refresh on 401
 
 ### Pre-existing follow-ups
 - `watermark.py` helper is **not wired** into `api/export.py` / `api/export_pdf.py`.
@@ -200,7 +205,7 @@ npm run lint
 python -m venv .venv
 .venv/Scripts/python.exe -m pip install -r requirements.txt
 # required env: OPENAI_API_KEY, JWT_SECRET (see .env.example)
-.venv/Scripts/python.exe -c "import api.index; print(len(api.index.app.routes))"  # 16
+.venv/Scripts/python.exe -c "import api.index; print(len(api.index.app.routes))"  # 17 (includes /api/auth/refresh)
 
 # Both processes
 npm run dev:all          # FastAPI :8000 + Next :3000
