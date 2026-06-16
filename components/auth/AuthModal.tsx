@@ -142,6 +142,28 @@ export function AuthModal({ mode, isOpen, onClose, onSwitchMode, onSuccess }: Au
               </button>
             </form>
 
+            <div className="auth-modal-divider">
+              <span>or</span>
+            </div>
+
+            <button
+              className="auth-modal-google"
+              onClick={() => {
+                const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+                if (!clientId) {
+                  setError('Google OAuth not configured');
+                  return;
+                }
+                const redirectUri = `${window.location.origin}/api/auth/google/callback`;
+                const scope = 'openid email profile';
+                const state = btoa(Math.random().toString(36)).substring(0, 16);
+                const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}`;
+                window.location.href = url;
+              }}
+            >
+              Continue with Google
+            </button>
+
             <div className="auth-modal-switch">
               {switchLabel}{' '}
               <button className="auth-modal-link" onClick={onSwitchMode}>

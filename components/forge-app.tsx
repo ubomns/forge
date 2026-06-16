@@ -221,10 +221,15 @@ export function ForgeApp() {
                 setPlanData(data.plan_data);
                 setDescription(data.idea_description);
                 setStatus('done');
-                // Mark all sections as done
+                // Mark all sections as done with their data
                 const doneSections: SectionsState = {} as SectionsState;
                 for (const id of SECTION_ORDER) {
-                    doneSections[id] = { status: 'done' };
+                    const sectionData = data.plan_data[id];
+                    if (sectionData) {
+                        doneSections[id] = { status: 'done', data: sectionData };
+                    } else {
+                        doneSections[id] = { status: 'pending' };
+                    }
                 }
                 setSections(doneSections);
                 setHydrated(true);
