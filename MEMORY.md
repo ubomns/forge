@@ -1,6 +1,6 @@
 # MEMORY.md — Forge Project Continuity (for an LLM)
 
-**Last updated:** 2026-06-15 (verification gate completed)
+**Last updated:** 2026-06-15 (merge to dev completed, Sprint 2 starting)
 **Purpose:** Hand a future LLM/agent everything needed to resume work without re-deriving context.
 **Read this first, then `git log --oneline -8` and the files cited below.**
 
@@ -12,9 +12,10 @@ The team is mid-way through building the **Conversion Playbook + Multi-Provider 
 
 - **Planning is 100% done** (gates G1–G4: PRD, architecture, ADRs, WBS, design spec).
 - **Build is partial:** Sprint 0 (backend foundation) and Sprint 1 (landing stale-copy) are **committed and verified**.
-- **Gate G5 approved by user.** Security audit completed; 5 of 6 blocking findings fixed directly by Engineering Lead and committed (see §9). qa-tester and code-reviewer **Task tool calls fail repeatedly** — Engineering Lead must run verification directly or user must approve merge without specialist evidence.
-- **Resume at:** Verification gate completed by Engineering Lead — e2e suite passes (20 passed, 3 skipped). A stray `nul` file (Windows reserved device name) was removed; it was blocking Next.js dev server / Turbopack. Pending user approval to merge `chore/claude-dev-team` → `dev`, then **Alembic migrations** (ADR-002 leftover), then **Sprint 2**.
-- **Active branch:** `chore/claude-dev-team` (NOT pushed; off `dev`). Security fixes committed as `fc8ba24`; model pins in `.opencode/agents/*.md` bumped to `kimi-k2.7` (uncommitted).
+- **Gate G5 approved by user.** Security audit completed; 5 of 6 blocking findings fixed directly by Engineering Lead and committed (see §9).
+- **Merge completed:** `chore/claude-dev-team` → `dev` pushed to origin (commit `818d17b`). Sprint 0 + Sprint 1 now on `dev`.
+- **Resume at:** **Sprint 2** — Auth UI + email capture + plan persistence. Alembic migrations (ADR-002) can run in parallel with Sprint 2 backend work.
+- **Active branch:** `dev` (merged). Create feature branches off `dev` for Sprint 2 work.
 
 To operate: start a Claude Code session in this repo (it auto-loads the **Engineering Lead** output style), set `/model claude-opus-4-8`, then say e.g. *"continue the verification gate"* or *"start Sprint 2."*
 
