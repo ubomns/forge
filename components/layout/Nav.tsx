@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/lib/auth';
+import { useAuthModal } from '@/components/auth/AuthModalManager';
 
 export function Nav() {
     const [scrolled, setScrolled] = useState(false);
+    const { user, logout } = useAuth();
+    const { openLogin, openSignup } = useAuthModal();
 
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 8);
@@ -11,6 +15,11 @@ export function Nav() {
         window.addEventListener('scroll', onScroll, { passive: true });
         return () => window.removeEventListener('scroll', onScroll);
     }, []);
+
+    const handleLogout = async () => {
+        await logout();
+        window.location.reload();
+    };
 
     return (
         <motion.nav
@@ -48,6 +57,31 @@ export function Nav() {
                 <Link href="/pricing" className="nav-link">
                     Pricing
                 </Link>
+                {user && (
+                    <Link href="/my-plans" className="nav-link">
+                        My plans
+                    </Link>
+                )}
+                {user ? (
+                    <div className="nav-auth">
+                        <span className="nav-user">{user.email}</span>
+                        {(user.tier === 'pro' || user.tier === 'team') && (
+                            <span className="nav-pro-badge">PRO</span>
+                        )}
+                        <button className="nav-logout" onClick={handleLogout}>
+                            Log out
+                        </button>
+                    </div>
+                ) : (
+                    <div className="nav-auth">
+                        <button className="nav-login" onClick={openLogin}>
+                            Log in
+                        </button>
+                        <button className="nav-signup" onClick={openSignup}>
+                            Sign up
+                        </button>
+                    </div>
+                )}
             </div>
         </motion.nav>
     );
