@@ -43,7 +43,7 @@ from api.auth import (
     verify_refresh_token,
 )
 from api.database import get_db
-from api.models import Plan, User
+from api.models import PasswordResetToken, Plan, User
 from api.schema import BusinessPlan
 
 logger = logging.getLogger(__name__)
@@ -296,3 +296,103 @@ async def me(
     Returns 401 if not authenticated (via get_current_user dependency).
     """
     return _user_response(current_user)
+
+
+# ---------------------------------------------------------------------------
+# Password reset
+# ---------------------------------------------------------------------------
+
+import secrets
+from datetime import datetime, timedelta, timezone
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(min_length=1)
+    new_password: str = Field(min_length=8)
+
+
+@router.post("/password-reset")
+async def password_reset(
+    body: PasswordResetRequest,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Request a password reset token.
+
+    Returns generic 200 regardless of whether email exists (prevents enumeration).
+    Token valid for 24 hours, single-use.
+    """
+    user = db.query(User).filter(User.email == body.email).first()
+    if user is None:
+        return {"message": "If this email is registered, a reset link has been sent"}
+
+    # Generate token
+    plain_token = secrets.token_urlsafe(32)
+    token_hash = hash_password(plain_token)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+
+    # Invalidate any existing tokens for this user
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used_at.is_(None),
+    ).update({"used_at": datetime.now(timezone.utc)})
+
+    reset_token = PasswordResetToken(
+        user_id=user.id,
+        token_hash=token_hash,
+        expires_at=expires_at,
+    )
+    db.add(reset_token)
+    db.commit()
+
+    # TODO: Send email with reset link containing plain_token
+    # For now, log the token (dev only — never log in production)
+    logger.info("Password reset token created (user_id=%s)", user.id)
+
+    return {"message": "If this email is registered, a reset link has been sent"}
+
+
+@router.post("/password-reset-confirm")
+async def password_reset_confirm(
+    body: PasswordResetConfirm,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Confirm password reset with token and new password."""
+    # Find valid token (not used, not expired)
+    now = datetime.now(timezone.utc)
+    tokens = (
+        db.query(PasswordResetToken)
+        .filter(PasswordResetToken.used_at.is_(None))
+        .filter(PasswordResetToken.expires_at > now)
+        .all()
+    )
+
+    valid_token = None
+    for t in tokens:
+        if verify_password(body.token, t.token_hash):
+            valid_token = t
+            break
+
+    if not valid_token:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "INVALID_TOKEN", "message": "Invalid or expired reset token"}},
+        )
+
+    user = db.query(User).filter(User.id == valid_token.user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "INVALID_TOKEN", "message": "User not found"}},
+        )
+
+    # Update password and mark token as used
+    user.password_hash = hash_password(body.new_password)
+    valid_token.used_at = now
+    db.commit()
+
+    logger.info("Password reset completed (user_id=%s)", user.id)
+    return {"message": "Password updated successfully"}

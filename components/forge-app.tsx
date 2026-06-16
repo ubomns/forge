@@ -18,6 +18,7 @@ import { CritiqueSummary } from '@/components/plan/CritiqueSummary';
 import { ActionStack } from '@/components/plan/ActionStack';
 import { InvestorQuestionsList } from '@/components/plan/InvestorQuestionCard';
 import { Nav } from '@/components/layout/Nav';
+import { FreePromptBanner } from '@/components/auth/FreePromptBanner';
 import { slugifyIdea } from '@/lib/utils';
 import type {
     BusinessPlan,
@@ -203,6 +204,37 @@ export function ForgeApp() {
         setHydrated(true);
     }, []);
     /* eslint-enable react-hooks/set-state-in-effect */
+
+    // ── Load saved plan from URL param (?plan_id=xxx) ───────────────────
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        const planId = params.get('plan_id');
+        if (!planId) return;
+
+        fetch(`/api/plans/${planId}`, { credentials: 'include' })
+            .then((res) => {
+                if (!res.ok) throw new Error('Plan not found or access denied');
+                return res.json();
+            })
+            .then((data) => {
+                setPlanData(data.plan_data);
+                setDescription(data.idea_description);
+                setStatus('done');
+                // Mark all sections as done
+                const doneSections: SectionsState = {} as SectionsState;
+                for (const id of SECTION_ORDER) {
+                    doneSections[id] = { status: 'done' };
+                }
+                setSections(doneSections);
+                setHydrated(true);
+            })
+            .catch((err) => {
+                setErrorMessage(err.message || 'Failed to load plan');
+                setStatus('error');
+                setHydrated(true);
+            });
+    }, []);
 
     // Persist on every relevant state change once hydration is complete.
     useEffect(() => {
@@ -690,6 +722,10 @@ export function ForgeApp() {
                                 onInvestorQuestions={handleInvestorQuestions}
                                 onReset={reset}
                             />
+
+                            {status === 'done' && (
+                                <FreePromptBanner planCount={1} />
+                            )}
                             </aside>
 
                             <div className="plan-main">
